@@ -1,45 +1,72 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { Users, X, Save, Plus } from 'lucide-react';
+import { Users, X, Save, Plus, MapPin, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function SupervisorClientes() {
   const [clients, setClients] = useState([]);
+  const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingClient, setEditingClient] = useState(null);
   const [newStatus, setNewStatus] = useState('');
   const [showModal, setShowModal] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    first_name: '', last_name: '', document_id: '', phone: '', address: '', plan_name: 'Fibra 50MB', notes: '', route_name: '', route_rating: '5'
-  });
+  const navigate = useNavigate();
 
-  const fetchClients = async () => {
+  const emptyForm = {
+    first_name: '', last_name: '', document_id: '',
+    phone: '', address: '', plan_name: 'Fibra 50MB',
+    notes: '', route_id: ''
+  };
+  const [formData, setFormData] = useState(emptyForm);
+
+  const fetchData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('clients')
-        .select(`*, profiles:asesor_id(full_name)`)
-        .order('created_at', { ascending: false });
-      if (error) throw error;
-      setClients(data);
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const [{ data: clientsData, error: clientsError }, { data: routesData, error: routesError }] = await Promise.all([
+        supabase
+          .from('clients')
+          .select('*, route:route_id(id, sector_name, fecha, sector_rating, municipio, barrio)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('routes')
+          .select('*')
+          .eq('supervisor_id', user.id)
+          .order('fecha', { ascending: false })
+      ]);
+
+      if (clientsError) throw clientsError;
+      if (routesError) throw routesError;
+
+      setClients(clientsData);
+      setRoutes(routesData);
     } catch (error) {
-      console.error('Error fetching clients:', error.message);
+      console.error('Error fetching data:', error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchClients(); }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.route_id) {
+      alert('Debes seleccionar una ruta antes de registrar un cliente.');
+      return;
+    }
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from('clients').insert([{ ...formData, asesor_id: user.id }]);
+      const { error } = await supabase.from('clients').insert([{
+        ...formData,
+        asesor_id: user.id,
+        route_id: formData.route_id || null
+      }]);
       if (error) throw error;
-      setFormData({ first_name: '', last_name: '', document_id: '', phone: '', address: '', plan_name: 'Fibra 50MB', notes: '', route_name: '', route_rating: '5' });
+      setFormData(emptyForm);
       setShowModal(false);
-      fetchClients();
+      fetchData();
     } catch (error) {
       alert('Error guardando cliente: ' + error.message);
     }
@@ -53,7 +80,7 @@ export default function SupervisorClientes() {
       const { error } = await supabase.from('clients').update({ status: newStatus }).eq('id', editingClient.id);
       if (error) throw error;
       setEditingClient(null);
-      fetchClients();
+      fetchData();
     } catch (error) {
       alert('Error actualizando estado: ' + error.message);
     }
@@ -64,18 +91,48 @@ export default function SupervisorClientes() {
     setNewStatus(client.status);
   };
 
+  // Formato legible para las rutas en el selector
+  const formatRouteLabel = (route) => {
+    const date = new Date(route.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
+    const location = [route.municipio, route.barrio].filter(Boolean).join(', ');
+    return `${date} — ${route.sector_name}${location ? ` (${location})` : ''} · ${route.sector_rating}/10`;
+  };
+
   return (
     <div>
       <div className="page-header">
         <div>
           <h2>Clientes</h2>
-          <p className="text-muted">Registro y gestión de clientes del equipo.</p>
+          <p className="text-muted">Registro y gestión de clientes vinculados a tus rutas.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={18} /> Nuevo Cliente
         </button>
       </div>
 
+      {/* Aviso si no hay rutas */}
+      {routes.length === 0 && !loading && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '1rem',
+          padding: '1rem 1.5rem', marginBottom: '1.5rem',
+          backgroundColor: 'rgba(245, 158, 11, 0.1)',
+          border: '1px solid rgba(245, 158, 11, 0.3)',
+          borderRadius: 'var(--radius-lg)', color: '#92400e'
+        }}>
+          <AlertCircle size={20} style={{ flexShrink: 0, color: '#f59e0b' }} />
+          <span>
+            Debes <strong>registrar una ruta del día</strong> antes de agregar clientes.{' '}
+            <button
+              onClick={() => navigate('/rutas')}
+              style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline', padding: 0 }}
+            >
+              Ir a Rutas →
+            </button>
+          </span>
+        </div>
+      )}
+
+      {/* Tabla de clientes */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)' }}>
           <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Listado de Clientes</h3>
@@ -84,27 +141,38 @@ export default function SupervisorClientes() {
           <table className="table">
             <thead>
               <tr>
-                <th>Supervisor</th>
                 <th>Cliente</th>
-                <th>Ruta / Plan</th>
-                <th>Estado Actual</th>
+                <th>Plan</th>
+                <th>Ruta Asociada</th>
+                <th>Estado</th>
                 <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {clients.map(c => (
                 <tr key={c.id}>
-                  <td style={{ fontWeight: 500 }}>{c.profiles?.full_name}</td>
                   <td>
                     <div className="client-name">{c.first_name} {c.last_name}</div>
-                    <div className="client-doc">Cel: {c.phone} | Dir: {c.address}</div>
+                    <div className="client-doc">Doc: {c.document_id} | Cel: {c.phone}</div>
                   </td>
+                  <td>{c.plan_name}</td>
                   <td>
-                    <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>{c.plan_name}</div>
-                    {c.route_name && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Ruta: {c.route_name} (Cal: {c.route_rating}⭐)
+                    {c.route ? (
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 500 }}>
+                          <MapPin size={13} style={{ color: 'var(--primary)' }} />
+                          {c.route.sector_name}
+                        </div>
+                        <div className="client-doc">
+                          {new Date(c.route.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {' · '}
+                          <span style={{ fontWeight: 600, color: c.route.sector_rating >= 7 ? 'var(--status-success-text)' : c.route.sector_rating >= 5 ? '#3b82f6' : '#f59e0b' }}>
+                            {c.route.sector_rating}/10
+                          </span>
+                        </div>
                       </div>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>Sin ruta</span>
                     )}
                   </td>
                   <td>
@@ -173,6 +241,39 @@ export default function SupervisorClientes() {
             </div>
             <div className="modal-body">
               <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                {/* Ruta — va primero para que el supervisor la seleccione antes */}
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <MapPin size={15} /> Ruta del Día <span style={{ color: 'var(--status-danger-text)' }}>*</span>
+                  </label>
+                  {routes.length === 0 ? (
+                    <div style={{
+                      padding: '0.875rem', borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                      border: '1px solid rgba(245, 158, 11, 0.3)',
+                      fontSize: '0.875rem', color: '#92400e'
+                    }}>
+                      No tienes rutas registradas hoy.{' '}
+                      <button
+                        type="button"
+                        onClick={() => { setShowModal(false); navigate('/rutas'); }}
+                        style={{ background: 'none', border: 'none', color: '#f59e0b', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline', padding: 0 }}
+                      >
+                        Registrar ruta →
+                      </button>
+                    </div>
+                  ) : (
+                    <select name="route_id" className="form-select" required value={formData.route_id} onChange={handleChange}>
+                      <option value="">— Selecciona la ruta del día —</option>
+                      {routes.map(route => (
+                        <option key={route.id} value={route.id}>
+                          {formatRouteLabel(route)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Nombres</label>
                   <input type="text" name="first_name" className="form-input" required value={formData.first_name} onChange={handleChange} />
@@ -193,7 +294,7 @@ export default function SupervisorClientes() {
                   <label className="form-label">Dirección Completa</label>
                   <input type="text" name="address" className="form-input" required value={formData.address} onChange={handleChange} />
                 </div>
-                <div className="form-group">
+                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                   <label className="form-label">Plan de Internet</label>
                   <select name="plan_name" className="form-select" value={formData.plan_name} onChange={handleChange}>
                     <option value="Fibra 50MB">Fibra 50MB</option>
@@ -203,27 +304,15 @@ export default function SupervisorClientes() {
                     <option value="Inalámbrico 20MB">Inalámbrico 20MB</option>
                   </select>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Ruta de Venta</label>
-                  <input type="text" name="route_name" className="form-input" placeholder="Ej: Zona Norte..." required value={formData.route_name} onChange={handleChange} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Calificación de la Ruta (1-5)</label>
-                  <select name="route_rating" className="form-select" value={formData.route_rating} onChange={handleChange}>
-                    <option value="5">⭐⭐⭐⭐⭐ Excelente</option>
-                    <option value="4">⭐⭐⭐⭐ Buena</option>
-                    <option value="3">⭐⭐⭐ Regular</option>
-                    <option value="2">⭐⭐ Mala</option>
-                    <option value="1">⭐ Muy Mala</option>
-                  </select>
-                </div>
                 <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
                   <label className="form-label">Notas Adicionales</label>
                   <textarea name="notes" className="form-textarea" rows="2" value={formData.notes} onChange={handleChange}></textarea>
                 </div>
-                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1rem' }}>
+                <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '0.5rem' }}>
                   <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar Cliente</button>
+                  <button type="submit" className="btn btn-primary" disabled={routes.length === 0}>
+                    <Save size={18} /> Guardar Cliente
+                  </button>
                 </div>
               </form>
             </div>
