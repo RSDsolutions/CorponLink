@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   Users, 
-  Settings, 
+  MapPin,
   LogOut,
   Signal
 } from 'lucide-react';
@@ -27,6 +27,14 @@ export default function Layout({ children, role, userProfile }) {
         <div className="sidebar-menu">
           <NavLink to="/" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} end>
             <LayoutDashboard size={20} /> Dashboard
+          </NavLink>
+
+          <NavLink to="/clientes" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
+            <Users size={20} /> Clientes
+          </NavLink>
+
+          <NavLink to="/rutas" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
+            <MapPin size={20} /> Rutas
           </NavLink>
           
           {role === 'admin' && (
