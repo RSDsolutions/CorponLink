@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { supabase } from '../services/supabase';
 import { NavLink } from 'react-router-dom';
 import { 
@@ -5,54 +6,84 @@ import {
   Users, 
   MapPin,
   LogOut,
-  Signal
+  Signal,
+  Menu,
+  X
 } from 'lucide-react';
 
 export default function Layout({ children, role, userProfile }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };
 
+  const closeSidebar = () => setSidebarOpen(false);
+
+  const navLinks = (
+    <>
+      <NavLink to="/" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} end onClick={closeSidebar}>
+        <LayoutDashboard size={20} /> Dashboard
+      </NavLink>
+      <NavLink to="/clientes" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+        <Users size={20} /> Clientes
+      </NavLink>
+      <NavLink to="/rutas" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+        <MapPin size={20} /> Rutas
+      </NavLink>
+      {role === 'admin' && (
+        <NavLink to="/users" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+          <Users size={20} /> Gestión de Usuarios
+        </NavLink>
+      )}
+      <button onClick={handleLogout} className="menu-item danger">
+        <LogOut size={20} /> Cerrar Sesión
+      </button>
+    </>
+  );
+
   return (
     <div className="app-container">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={closeSidebar}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-header">
-          <div className="kpi-icon blue" style={{ width: 32, height: 32, marginBottom: 0, borderRadius: 8 }}>
+          <div className="kpi-icon blue" style={{ width: 32, height: 32, marginBottom: 0, borderRadius: 8, flexShrink: 0 }}>
             <Signal size={20} />
           </div>
           <div className="sidebar-logo">CorponNet</div>
-        </div>
-        
-        <div className="sidebar-menu">
-          <NavLink to="/" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} end>
-            <LayoutDashboard size={20} /> Dashboard
-          </NavLink>
-
-          <NavLink to="/clientes" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
-            <Users size={20} /> Clientes
-          </NavLink>
-
-          <NavLink to="/rutas" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
-            <MapPin size={20} /> Rutas
-          </NavLink>
-          
-          {role === 'admin' && (
-            <NavLink to="/users" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`}>
-              <Users size={20} /> Gestión de Usuarios
-            </NavLink>
-          )}
-
-          <button onClick={handleLogout} className="menu-item danger">
-            <LogOut size={20} /> Cerrar Sesión
+          <button
+            className="sidebar-close-btn"
+            onClick={closeSidebar}
+            aria-label="Cerrar menú"
+          >
+            <X size={20} />
           </button>
+        </div>
+        <div className="sidebar-menu">
+          {navLinks}
         </div>
       </aside>
 
       {/* Main Area */}
       <div className="main-wrapper">
         <header className="top-header">
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {/* Hamburger button — only visible on mobile */}
+            <button
+              className="hamburger-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir menú"
+            >
+              <Menu size={22} />
+            </button>
             <h3 style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: 500 }}>
               Panel de Control
             </h3>

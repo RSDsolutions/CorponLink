@@ -32,7 +32,7 @@ export default function AdminRutas() {
         .select(`
           *,
           profiles:supervisor_id(full_name),
-          clients(id, first_name, last_name, document_id, phone, plan_name, status)
+          clients!clients_route_id_fkey(id, first_name, last_name, document_id, phone, plan_name, status)
         `)
         .order('fecha', { ascending: false });
 
