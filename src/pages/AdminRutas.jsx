@@ -27,6 +27,7 @@ export default function AdminRutas() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [supervisorFilter, setSupervisorFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
   const [supervisors, setSupervisors] = useState([]);
   const [expandedRoutes, setExpandedRoutes] = useState({});
 
@@ -76,8 +77,29 @@ export default function AdminRutas() {
       r.sector_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.municipio && r.municipio.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (r.barrio && r.barrio.toLowerCase().includes(searchTerm.toLowerCase()));
+    
     const matchesSupervisor = supervisorFilter === '' || r.supervisor_id === supervisorFilter;
-    return matchesSearch && matchesSupervisor;
+    
+    let matchesDate = true;
+    if (dateFilter !== 'all') {
+      const routeDate = new Date(r.fecha + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (dateFilter === 'today') {
+        matchesDate = routeDate.getTime() === today.getTime();
+      } else if (dateFilter === 'week') {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        matchesDate = routeDate >= startOfWeek;
+      } else if (dateFilter === 'month') {
+        matchesDate = routeDate.getMonth() === today.getMonth() && routeDate.getFullYear() === today.getFullYear();
+      } else if (dateFilter === 'year') {
+        matchesDate = routeDate.getFullYear() === today.getFullYear();
+      }
+    }
+
+    return matchesSearch && matchesSupervisor && matchesDate;
   });
 
   const avgRating = filteredRoutes.length > 0
@@ -190,6 +212,15 @@ export default function AdminRutas() {
               {supervisors.map(s => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
+            </select>
+          </div>
+          <div style={{ flex: 1, minWidth: '160px' }}>
+            <select className="form-select" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}>
+              <option value="all">Todas las fechas</option>
+              <option value="today">Hoy</option>
+              <option value="week">Esta Semana</option>
+              <option value="month">Este Mes</option>
+              <option value="year">Este Año</option>
             </select>
           </div>
         </div>
