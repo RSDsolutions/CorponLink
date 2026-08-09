@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { MapPin, Star, Calendar, Download, Search, TrendingUp, ChevronDown, ChevronRight, Users } from 'lucide-react';
+import { MapPin, Star, Calendar, Download, Search, TrendingUp, ChevronDown, ChevronRight, Users, Clock } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const RATING_LABELS = {
@@ -15,6 +15,13 @@ const getRatingColor = (rating) => {
   return 'var(--status-success-text)';
 };
 
+const formatTime = (t) => {
+  if (!t) return null;
+  const [h, m] = t.split(':');
+  const hour = parseInt(h);
+  return `${hour > 12 ? hour - 12 : hour || 12}:${m} ${hour >= 12 ? 'PM' : 'AM'}`;
+};
+
 export default function AdminRutas() {
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,21 +33,33 @@ export default function AdminRutas() {
   const fetchRoutes = async () => {
     setLoading(true);
     try {
-      // Obtener rutas con sus clientes enlazados
-      const { data, error } = await supabase
+      // Query 1: all routes with supervisor profile
+      const { data: routesData, error: routesError } = await supabase
         .from('routes')
-        .select(`
-          *,
-          profiles:supervisor_id(full_name),
-          clients!clients_route_id_fkey(id, first_name, last_name, document_id, phone, plan_name, status)
-        `)
+        .select('*, profiles:supervisor_id(full_name)')
         .order('fecha', { ascending: false });
 
-      if (error) throw error;
-      setRoutes(data);
+      if (routesError) throw routesError;
 
+      // Query 2: all clients that have a route_id (to avoid FK embed issues)
+      const { data: clientsData, error: clientsError } = await supabase
+        .from('clients')
+        .select('id, first_name, last_name, document_id, phone, plan_name, status, route_id')
+        .not('route_id', 'is', null);
+
+      if (clientsError) throw clientsError;
+
+      // Combine: attach clients array to each route
+      const combined = routesData.map(route => ({
+        ...route,
+        clients: clientsData.filter(c => c.route_id === route.id)
+      }));
+
+      setRoutes(combined);
+
+      // Extract unique supervisors for filter dropdown
       const uniqueSups = [...new Map(
-        data.map(r => [r.supervisor_id, r.profiles?.full_name])
+        routesData.map(r => [r.supervisor_id, r.profiles?.full_name])
       ).entries()].map(([id, name]) => ({ id, name }));
       setSupervisors(uniqueSups);
     } catch (error) {
@@ -79,8 +98,10 @@ export default function AdminRutas() {
         'Sector': r.sector_name,
         'Municipio': r.municipio || '',
         'Barrio': r.barrio || '',
-        'Total Visitas': r.total_visitas,
-        'Total Ventas': r.total_ventas,
+        'Hora Inicio': r.hora_inicio || '',
+        'Hora Fin': r.hora_fin || '',
+        'Total Visitas': r.total_visitas || 0,
+        'Total Ventas': r.total_ventas || 0,
         'Clientes Registrados': r.clients?.length || 0,
         'Calificación (1-10)': r.sector_rating,
         'Nivel': RATING_LABELS[r.sector_rating] || '',
@@ -104,7 +125,8 @@ export default function AdminRutas() {
     const worksheet = XLSX.utils.json_to_sheet(rows);
     worksheet['!cols'] = [
       { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 18 }, { wch: 18 },
-      { wch: 12 }, { wch: 12 }, { wch: 18 }, { wch: 15 }, { wch: 14 }, { wch: 40 },
+      { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 18 },
+      { wch: 15 }, { wch: 14 }, { wch: 40 },
       { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 15 }
     ];
     const workbook = XLSX.utils.book_new();
@@ -117,10 +139,10 @@ export default function AdminRutas() {
       <div className="page-header">
         <div>
           <h2>Rutas</h2>
-          <p className="text-muted">Historial de rutas con detalle de clientes enlazados por sector.</p>
+          <p className="text-muted">Historial de rutas con clientes enlazados por sector.</p>
         </div>
         <button className="btn btn-primary" onClick={exportToExcel} style={{ backgroundColor: 'var(--status-success-text)' }}>
-          <Download size={18} /> Descargar Excel (.xlsx)
+          <Download size={18} /> Descargar Excel
         </button>
       </div>
 
@@ -150,18 +172,19 @@ export default function AdminRutas() {
         </div>
       </div>
 
-      {/* Filtros */}
+      {/* Tabla / lista */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 2, minWidth: '250px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        {/* Filtros */}
+        <div className="card-header" style={{ padding: '1.25rem 1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ position: 'relative', flex: 2, minWidth: '220px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '0.875rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
-              type="text" className="form-input" placeholder="Buscar sector, municipio, barrio..."
-              style={{ paddingLeft: '2.5rem' }} value={searchTerm}
+              type="text" className="form-input" placeholder="Buscar sector, municipio..."
+              style={{ paddingLeft: '2.25rem' }} value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div style={{ flex: 1, minWidth: '200px' }}>
+          <div style={{ flex: 1, minWidth: '180px' }}>
             <select className="form-select" value={supervisorFilter} onChange={(e) => setSupervisorFilter(e.target.value)}>
               <option value="">Todos los supervisores</option>
               {supervisors.map(s => (
@@ -171,104 +194,135 @@ export default function AdminRutas() {
           </div>
         </div>
 
-        {/* Rutas con clientes expandibles */}
+        {/* Rutas expandibles */}
         <div style={{ padding: '1rem' }}>
+          {loading && (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>Cargando rutas...</div>
+          )}
+
+          {!loading && filteredRoutes.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+              No hay rutas registradas aún.
+            </div>
+          )}
+
           {filteredRoutes.map(r => (
             <div key={r.id} style={{
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)',
-              marginBottom: '0.75rem', overflow: 'hidden',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-lg)',
+              marginBottom: '0.75rem',
+              overflow: 'hidden',
               transition: 'box-shadow 0.2s ease'
             }}>
-              {/* Cabecera de ruta */}
+              {/* Cabecera clickeable */}
               <div
                 onClick={() => toggleExpand(r.id)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '1rem',
-                  padding: '1rem 1.25rem', cursor: 'pointer',
-                  background: expandedRoutes[r.id] ? 'rgba(var(--primary-rgb, 59, 130, 246), 0.05)' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '1rem',
+                  padding: '1rem 1.25rem',
+                  cursor: 'pointer',
+                  background: expandedRoutes[r.id] ? 'rgba(79, 70, 229, 0.04)' : 'transparent',
                   flexWrap: 'wrap'
                 }}
               >
-                <div style={{ marginRight: 'auto', flex: 1, minWidth: '200px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                    <MapPin size={15} style={{ color: 'var(--primary)' }} />
-                    <span style={{ fontWeight: 700, fontSize: '1rem' }}>{r.sector_name}</span>
+                {/* Info principal */}
+                <div style={{ flex: 1, minWidth: '180px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                    <MapPin size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.sector_name}</span>
                   </div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                    <strong style={{ color: 'var(--primary)' }}>{r.profiles?.full_name}</strong>
-                    {' · '}
-                    <Calendar size={11} style={{ display: 'inline', verticalAlign: 'middle' }} />
-                    {' '}
-                    {new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                    {r.municipio && ` · ${[r.municipio, r.barrio].filter(Boolean).join(', ')}`}
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{r.profiles?.full_name}</span>
+                    <span>·</span>
+                    <span>
+                      <Calendar size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />
+                      {new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                    </span>
+                    {(r.hora_inicio || r.hora_fin) && (
+                      <>
+                        <span>·</span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                          <Clock size={11} />
+                          {formatTime(r.hora_inicio)} {r.hora_fin ? `→ ${formatTime(r.hora_fin)}` : ''}
+                        </span>
+                      </>
+                    )}
+                    {r.municipio && <span>· {[r.municipio, r.barrio].filter(Boolean).join(', ')}</span>}
                   </div>
                 </div>
 
                 {/* Métricas */}
-                <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexShrink: 0 }}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700 }}>{r.total_visitas}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Visitas</div>
+                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{r.total_visitas || 0}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Visitas</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--status-success-text)' }}>{r.total_ventas}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Ventas</div>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--status-success-text)' }}>{r.total_ventas || 0}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Ventas</div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, color: '#8b5cf6' }}>{r.clients?.length || 0}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Clientes</div>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', color: '#8b5cf6' }}>{r.clients?.length || 0}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Clientes</div>
                   </div>
                   {/* Rating badge */}
                   <div style={{
-                    width: 40, height: 40, borderRadius: '50%',
+                    width: 38, height: 38, borderRadius: '50%',
                     background: getRatingColor(r.sector_rating),
                     color: 'white', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontWeight: 700
+                    justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem',
+                    flexShrink: 0
                   }}>
                     {r.sector_rating}
                   </div>
-                  {/* Expand icon */}
-                  {expandedRoutes[r.id] ? <ChevronDown size={18} style={{ color: 'var(--text-muted)' }} /> : <ChevronRight size={18} style={{ color: 'var(--text-muted)' }} />}
+                  {expandedRoutes[r.id]
+                    ? <ChevronDown size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                    : <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                  }
                 </div>
               </div>
 
-              {/* Clientes de la ruta */}
+              {/* Clientes de la ruta — expandible */}
               {expandedRoutes[r.id] && (
-                <div style={{ borderTop: '1px solid var(--border)', backgroundColor: 'rgba(0,0,0,0.02)' }}>
+                <div style={{ borderTop: '1px solid var(--border)', backgroundColor: 'rgba(248, 250, 252, 0.8)' }}>
                   {r.clients && r.clients.length > 0 ? (
-                    <table className="table" style={{ margin: 0 }}>
-                      <thead>
-                        <tr>
-                          <th style={{ paddingLeft: '2rem' }}>Cliente</th>
-                          <th>Doc. Identidad</th>
-                          <th>Teléfono</th>
-                          <th>Plan</th>
-                          <th>Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {r.clients.map(c => (
-                          <tr key={c.id}>
-                            <td style={{ paddingLeft: '2rem' }}>
-                              <div className="client-name">{c.first_name} {c.last_name}</div>
-                            </td>
-                            <td><div className="client-doc">{c.document_id}</div></td>
-                            <td><div style={{ fontSize: '0.875rem' }}>{c.phone}</div></td>
-                            <td><div style={{ fontSize: '0.875rem' }}>{c.plan_name}</div></td>
-                            <td>
-                              <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
-                            </td>
+                    <div className="table-responsive">
+                      <table className="table" style={{ margin: 0 }}>
+                        <thead>
+                          <tr>
+                            <th style={{ paddingLeft: '2rem' }}>Cliente</th>
+                            <th>Doc. Identidad</th>
+                            <th>Teléfono</th>
+                            <th>Plan</th>
+                            <th>Estado</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {r.clients.map(c => (
+                            <tr key={c.id}>
+                              <td style={{ paddingLeft: '2rem' }}>
+                                <div className="client-name">{c.first_name} {c.last_name}</div>
+                              </td>
+                              <td><div className="client-doc">{c.document_id}</div></td>
+                              <td><div style={{ fontSize: '0.875rem' }}>{c.phone}</div></td>
+                              <td><div style={{ fontSize: '0.875rem' }}>{c.plan_name}</div></td>
+                              <td>
+                                <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   ) : (
                     <div style={{ padding: '1.25rem 2rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontStyle: 'italic' }}>
-                      No hay clientes registrados en esta ruta.
+                      No hay clientes registrados en esta ruta aún.
                     </div>
                   )}
                   {r.observaciones && (
-                    <div style={{ padding: '0.75rem 1.25rem', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'white' }}>
                       <strong>Observaciones:</strong> {r.observaciones}
                     </div>
                   )}
@@ -276,11 +330,6 @@ export default function AdminRutas() {
               )}
             </div>
           ))}
-          {filteredRoutes.length === 0 && !loading && (
-            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-              No hay rutas registradas.
-            </div>
-          )}
         </div>
       </div>
     </div>

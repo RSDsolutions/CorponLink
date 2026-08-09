@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { MapPin, Plus, X, Save, Star, Calendar, TrendingUp } from 'lucide-react';
+import { MapPin, Plus, X, Save, Star, Calendar, TrendingUp, Clock } from 'lucide-react';
 
 const RATING_LABELS = {
   1: 'Muy Malo', 2: 'Malo', 3: 'Regular', 4: 'Bueno', 5: 'Bueno+',
@@ -24,6 +24,8 @@ export default function SupervisorRutas() {
     sector_name: '',
     municipio: '',
     barrio: '',
+    hora_inicio: '',
+    hora_fin: '',
     total_visitas: '',
     total_ventas: '',
     sector_rating: '7',
@@ -68,6 +70,7 @@ export default function SupervisorRutas() {
       setFormData({
         fecha: new Date().toISOString().split('T')[0],
         sector_name: '', municipio: '', barrio: '',
+        hora_inicio: '', hora_fin: '',
         total_visitas: '', total_ventas: '', sector_rating: '7', observaciones: ''
       });
       setShowModal(false);
@@ -123,7 +126,7 @@ export default function SupervisorRutas() {
           <table className="table">
             <thead>
               <tr>
-                <th>Fecha</th>
+                <th>Fecha / Horario</th>
                 <th>Sector / Ubicación</th>
                 <th>Visitas / Ventas</th>
                 <th>Calificación</th>
@@ -134,12 +137,18 @@ export default function SupervisorRutas() {
               {routes.map(r => (
                 <tr key={r.id}>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Calendar size={14} style={{ color: 'var(--text-muted)' }} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                      <Calendar size={13} style={{ color: 'var(--text-muted)' }} />
                       <span style={{ fontSize: '0.875rem' }}>
                         {new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
                       </span>
                     </div>
+                    {(r.hora_inicio || r.hora_fin) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        <Clock size={11} />
+                        {r.hora_inicio || '--'} → {r.hora_fin || '--'}
+                      </div>
+                    )}
                   </td>
                   <td>
                     <div className="client-name">{r.sector_name}</div>
@@ -229,6 +238,19 @@ export default function SupervisorRutas() {
                 <div className="form-group">
                   <label className="form-label">Total Ventas Cerradas</label>
                   <input type="number" name="total_ventas" className="form-input" min="0" placeholder="0" value={formData.total_ventas} onChange={handleChange} />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Clock size={14} /> Hora de Inicio
+                  </label>
+                  <input type="time" name="hora_inicio" className="form-input" value={formData.hora_inicio} onChange={handleChange} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Clock size={14} /> Hora de Fin
+                  </label>
+                  <input type="time" name="hora_fin" className="form-input" value={formData.hora_fin} onChange={handleChange} />
                 </div>
 
                 {/* Rating visual */}
