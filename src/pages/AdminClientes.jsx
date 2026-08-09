@@ -9,6 +9,7 @@ export default function AdminClientes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sectorFilter, setSectorFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('all');
 
   const fetchClients = async () => {
     try {
@@ -41,12 +42,34 @@ export default function AdminClientes() {
       c.document_id.includes(searchTerm);
     const matchesStatus = statusFilter === '' || c.status === statusFilter;
     const matchesSector = sectorFilter === '' || c.route?.sector_name === sectorFilter;
-    return matchesSearch && matchesStatus && matchesSector;
+    
+    let matchesDate = true;
+    if (dateFilter !== 'all') {
+      const clientDate = new Date(c.created_at);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (dateFilter === 'today') {
+        const clientDay = new Date(clientDate);
+        clientDay.setHours(0, 0, 0, 0);
+        matchesDate = clientDay.getTime() === today.getTime();
+      } else if (dateFilter === 'week') {
+        const startOfWeek = new Date(today);
+        startOfWeek.setDate(today.getDate() - today.getDay());
+        matchesDate = clientDate >= startOfWeek;
+      } else if (dateFilter === 'month') {
+        matchesDate = clientDate.getMonth() === today.getMonth() && clientDate.getFullYear() === today.getFullYear();
+      } else if (dateFilter === 'year') {
+        matchesDate = clientDate.getFullYear() === today.getFullYear();
+      }
+    }
+    
+    return matchesSearch && matchesStatus && matchesSector && matchesDate;
   });
 
-  const total = clients.length;
-  const activos = clients.filter(c => c.status === 'Activo').length;
-  const pendientes = clients.filter(c => ['Registrado', 'Contactado', 'Programado'].includes(c.status)).length;
+  const total = filteredClients.length;
+  const activos = filteredClients.filter(c => c.status === 'Activo').length;
+  const pendientes = filteredClients.filter(c => ['Registrado', 'Contactado', 'Programado'].includes(c.status)).length;
 
   const exportToExcel = () => {
     if (filteredClients.length === 0) return;
@@ -137,6 +160,15 @@ export default function AdminClientes() {
               {uniqueSectors.map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
+            </select>
+          </div>
+          <div style={{ flex: 1, minWidth: '160px' }}>
+            <select className="form-select" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}>
+              <option value="all">Todas las fechas</option>
+              <option value="today">Hoy</option>
+              <option value="week">Esta Semana</option>
+              <option value="month">Este Mes</option>
+              <option value="year">Este Año</option>
             </select>
           </div>
         </div>
