@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, getDemoUser, setDemoSession } from '../services/supabase';
 import { LogIn, Signal } from 'lucide-react';
 
 export default function Login() {
@@ -13,9 +13,19 @@ export default function Login() {
     setLoading(true);
     setError(null);
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const demoUser = getDemoUser(normalizedEmail, password);
+
+    if (demoUser) {
+      setDemoSession(demoUser);
+      window.location.href = '/';
+      return;
+    }
+
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (error) throw error;
+      window.location.href = '/';
     } catch (error) {
       setError('Credenciales inválidas. Verifica tu correo y contraseña.');
     } finally {

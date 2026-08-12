@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, clearDemoSession } from '../services/supabase';
 import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -15,7 +15,9 @@ export default function Layout({ children, role, userProfile }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
+    clearDemoSession();
     await supabase.auth.signOut();
+    window.location.href = '/login';
   };
 
   const closeSidebar = () => setSidebarOpen(false);

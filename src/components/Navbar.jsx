@@ -1,9 +1,11 @@
-import { supabase } from '../services/supabase';
+import { supabase, clearDemoSession } from '../services/supabase';
 import { LogOut, User } from 'lucide-react';
 
 export default function Navbar({ role }) {
   const handleLogout = async () => {
+    clearDemoSession();
     await supabase.auth.signOut();
+    window.location.href = '/login';
   };
 
   return (
