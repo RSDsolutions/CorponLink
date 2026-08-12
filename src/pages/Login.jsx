@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { supabase, getDemoUser, setDemoSession } from '../services/supabase';
+import { supabase } from '../services/supabase';
 import { LogIn, Signal } from 'lucide-react';
 
 export default function Login() {
@@ -14,13 +14,6 @@ export default function Login() {
     setError(null);
 
     const normalizedEmail = email.trim().toLowerCase();
-    const demoUser = getDemoUser(normalizedEmail, password);
-
-    if (demoUser) {
-      setDemoSession(demoUser);
-      window.location.href = '/';
-      return;
-    }
 
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { supabase, getDemoSession } from './services/supabase';
+import { supabase } from './services/supabase';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminClientes from './pages/AdminClientes';
@@ -78,23 +78,7 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const applyDemoSession = () => {
-      const demoSession = getDemoSession();
-      if (!demoSession) return false;
-
-      setSession({ user: { id: demoSession.id, email: demoSession.email } });
-      setUserProfile({
-        id: demoSession.id,
-        full_name: demoSession.full_name,
-        role: demoSession.role,
-      });
-      setLoading(false);
-      return true;
-    };
-
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (applyDemoSession()) return;
-
       setSession(session);
       if (session) {
         fetchProfile(session.user.id);
@@ -104,8 +88,6 @@ function App() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (applyDemoSession()) return;
-
       setSession(session);
       if (session) {
         fetchProfile(session.user.id);
@@ -127,15 +109,6 @@ function App() {
         .single();
 
       if (error) {
-        const demoSession = getDemoSession();
-        if (demoSession && demoSession.id === userId) {
-          setUserProfile({
-            id: demoSession.id,
-            full_name: demoSession.full_name,
-            role: demoSession.role,
-          });
-          return;
-        }
         throw error;
       }
 

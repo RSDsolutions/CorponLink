@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, mergeProfilesWithDemo } from '../services/supabase';
+import { supabase } from '../services/supabase';
 
 export default function AdminUsers() {
   const [profiles, setProfiles] = useState([]);
@@ -16,10 +16,10 @@ export default function AdminUsers() {
         .order('role', { ascending: false });
 
       if (error) throw error;
-      setProfiles(mergeProfilesWithDemo(data || []));
+      setProfiles(data || []);
     } catch (error) {
       console.error('Error fetching profiles:', error.message);
-      setProfiles(mergeProfilesWithDemo([]));
+      setProfiles([]);
     } finally {
       setLoading(false);
     }
