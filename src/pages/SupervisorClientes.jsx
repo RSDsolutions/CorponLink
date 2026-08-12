@@ -45,6 +45,9 @@ export default function SupervisorClientes() {
   // Modal Confirmar Eliminar CA, BA, NPC
   const [techClientToDelete, setTechClientToDelete] = useState(null);
 
+  // Modal Ver Cliente Completo
+  const [viewClient, setViewClient] = useState(null);
+
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -260,7 +263,7 @@ export default function SupervisorClientes() {
                 const isEliminado = c.status === 'Eliminado';
 
                 return (
-                  <tr key={c.id} style={{ opacity: isEliminado ? 0.7 : 1, backgroundColor: isEliminado ? 'rgba(239, 68, 68, 0.03)' : 'transparent' }}>
+                  <tr key={c.id} style={{ opacity: isEliminado ? 0.7 : 1, backgroundColor: isEliminado ? 'rgba(239, 68, 68, 0.03)' : 'transparent', cursor: 'pointer' }} onClick={() => setViewClient(c)}>
                     <td>
                       <div className="client-name">{c.first_name} {c.last_name}</div>
                       <div className="client-doc">Cédula: <strong>{c.document_id}</strong></div>
@@ -354,7 +357,7 @@ export default function SupervisorClientes() {
                       )}
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
                         <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }}>
                           Estado
                         </button>
@@ -445,8 +448,8 @@ export default function SupervisorClientes() {
                     <input type="text" name="document_id" className="form-input" required pattern="^[0-9A-Za-z\-]+$" title="Solo letras, números y guiones" placeholder="Ej: 1098765432" value={formData.document_id} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Correo Electrónico</label>
-                    <input type="email" name="email" className="form-input" placeholder="ejemplo@correo.com" value={formData.email} onChange={handleChange} />
+                    <label className="form-label">Correo Electrónico *</label>
+                    <input type="email" name="email" className="form-input" required placeholder="ejemplo@correo.com" value={formData.email} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Nombres *</label>
@@ -461,8 +464,8 @@ export default function SupervisorClientes() {
                     <input type="text" name="phone" className="form-input" required pattern="^[0-9+\-\s()]+$" title="Solo números y símbolos telefónicos" placeholder="Teléfono principal" value={formData.phone} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Número Telefónico de Referencia</label>
-                    <input type="text" name="reference_phone" className="form-input" pattern="^[0-9+\-\s()]*$" title="Solo números y símbolos telefónicos" placeholder="Teléfono de familiar/referencia" value={formData.reference_phone} onChange={handleChange} />
+                    <label className="form-label">Número Telefónico de Referencia *</label>
+                    <input type="text" name="reference_phone" className="form-input" required pattern="^[0-9+\-\s()]*$" title="Solo números y símbolos telefónicos" placeholder="Teléfono de familiar/referencia" value={formData.reference_phone} onChange={handleChange} />
                   </div>
                 </div>
 
@@ -476,8 +479,8 @@ export default function SupervisorClientes() {
                     <input type="text" name="address" className="form-input" required placeholder="Ej: Calle 45 con Carrera 12, Esquina #45-12" value={formData.address} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
-                    <label className="form-label">Referencia de Vivienda</label>
-                    <input type="text" name="housing_reference" className="form-input" placeholder="Ej: Casa blanca de dos pisos frente al parque" value={formData.housing_reference} onChange={handleChange} />
+                    <label className="form-label">Referencia de Vivienda *</label>
+                    <input type="text" name="housing_reference" className="form-input" required placeholder="Ej: Casa blanca de dos pisos frente al parque" value={formData.housing_reference} onChange={handleChange} />
                   </div>
                 </div>
 
@@ -487,12 +490,12 @@ export default function SupervisorClientes() {
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.875rem', marginBottom: '1.25rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Número de Cuenta</label>
-                    <input type="text" name="bank_account_number" className="form-input" placeholder="N° de cuenta bancaria" value={formData.bank_account_number} onChange={handleChange} />
+                    <label className="form-label">Número de Cuenta *</label>
+                    <input type="text" name="bank_account_number" className="form-input" required pattern="^[0-9]+$" title="Solo números" placeholder="N° de cuenta bancaria" value={formData.bank_account_number} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Tipo de Cuenta</label>
-                    <select name="bank_account_type" className="form-select" value={formData.bank_account_type} onChange={handleChange}>
+                    <label className="form-label">Tipo de Cuenta *</label>
+                    <select name="bank_account_type" className="form-select" required value={formData.bank_account_type} onChange={handleChange}>
                       <option value="Ahorros">Ahorros</option>
                       <option value="Corriente">Corriente</option>
                       <option value="Básica">Básica</option>
@@ -500,8 +503,8 @@ export default function SupervisorClientes() {
                     </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Banco</label>
-                    <select name="bank_name" className="form-select" value={formData.bank_name} onChange={handleChange}>
+                    <label className="form-label">Banco *</label>
+                    <select name="bank_name" className="form-select" required value={formData.bank_name} onChange={handleChange}>
                       <option value="">Seleccione el Banco...</option>
                       <option value="Pichincha">Banco Pichincha</option>
                       <option value="Guayaquil">Banco de Guayaquil</option>
@@ -544,8 +547,8 @@ export default function SupervisorClientes() {
                     </datalist>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Promoción</label>
-                    <input type="text" name="promotion" className="form-input" placeholder="Ej: Ninguna, 50% DCTO 1er mes" value={formData.promotion} onChange={handleChange} />
+                    <label className="form-label">Promoción *</label>
+                    <input type="text" name="promotion" className="form-input" required placeholder="Ej: Ninguna, 50% DCTO 1er mes" value={formData.promotion} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Valor del Plan sin IVA ($) *</label>
@@ -554,8 +557,8 @@ export default function SupervisorClientes() {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                  <label className="form-label">Notas Adicionales</label>
-                  <textarea name="notes" className="form-textarea" rows="2" placeholder="Observaciones o notas del contrato" value={formData.notes} onChange={handleChange}></textarea>
+                  <label className="form-label">Notas Adicionales *</label>
+                  <textarea name="notes" className="form-textarea" required rows="2" placeholder="Observaciones o notas del contrato" value={formData.notes} onChange={handleChange}></textarea>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
@@ -747,6 +750,63 @@ export default function SupervisorClientes() {
                 <button type="button" className="btn" style={{ backgroundColor: 'var(--status-danger-text)', color: 'white' }} onClick={confirmDeleteTechData}>
                   <Trash2 size={16} /> Confirmar Eliminación
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Ver Cliente Completo */}
+      {viewClient && (
+        <div className="modal-overlay" onClick={() => setViewClient(null)}>
+          <div className="modal-content" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ margin: 0 }}>Detalles del Cliente</h3>
+                <span className={`badge badge-${viewClient.status.toLowerCase()}`} style={{ marginTop: '0.25rem', display: 'inline-block' }}>{viewClient.status}</span>
+              </div>
+              <button onClick={() => setViewClient(null)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><User size={14} /> Información Personal</h4>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Nombre:</strong> {viewClient.first_name} {viewClient.last_name}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Cédula:</strong> {viewClient.document_id}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Email:</strong> {viewClient.email}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Teléfono:</strong> {viewClient.phone}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Tel Ref:</strong> {viewClient.reference_phone}</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><MapPin size={14} /> Ubicación</h4>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Dirección:</strong> {viewClient.address}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Referencia:</strong> {viewClient.housing_reference}</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><CreditCard size={14} /> Banco y Plan</h4>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Banco:</strong> {viewClient.bank_name}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Cuenta ({viewClient.bank_account_type}):</strong> {viewClient.bank_account_number}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Plan:</strong> {viewClient.plan_family} - {viewClient.bandwidth}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Promoción:</strong> {viewClient.promotion}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Precio (Sin IVA):</strong> ${Number(viewClient.plan_price_no_iva).toLocaleString('es-CO')}</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Cpu size={14} /> Datos Técnicos</h4>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>CA:</strong> {viewClient.ca || 'N/A'}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>BA:</strong> {viewClient.ba || 'N/A'}</p>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>NPC:</strong> {viewClient.npc || 'N/A'}</p>
+                </div>
+              </div>
+              {viewClient.notes && (
+                <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid var(--border)' }}>
+                  <strong>Notas Adicionales:</strong>
+                  <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: 'var(--text-muted)' }}>{viewClient.notes}</p>
+                </div>
+              )}
+              <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setViewClient(null)}>Cerrar</button>
               </div>
             </div>
           </div>
