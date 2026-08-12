@@ -8,6 +8,7 @@ import AdminRutas from './pages/AdminRutas';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import SupervisorClientes from './pages/SupervisorClientes';
 import SupervisorRutas from './pages/SupervisorRutas';
+import SupervisorAsesores from './pages/SupervisorAsesores';
 import AdminUsers from './pages/AdminUsers';
 import Layout from './components/Layout';
 
@@ -171,6 +172,18 @@ function App() {
               <Navigate to="/login" replace />
             ) : isAdmin ? (
               withLayout(<AdminUsers />)
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/supervisor/asesores"
+          element={
+            !session ? (
+              <Navigate to="/login" replace />
+            ) : isSupervisor ? (
+              withLayout(<SupervisorAsesores />)
             ) : (
               <Navigate to="/" replace />
             )

@@ -97,6 +97,7 @@ export default function AdminRutas() {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
       (r.sector_name || '').toLowerCase().includes(searchLower) ||
+      (r.provincia && r.provincia.toLowerCase().includes(searchLower)) ||
       (r.municipio && r.municipio.toLowerCase().includes(searchLower)) ||
       (r.barrio && r.barrio.toLowerCase().includes(searchLower));
     
@@ -142,7 +143,7 @@ export default function AdminRutas() {
         'Fecha': new Date(r.fecha + 'T00:00:00').toLocaleDateString(),
         'Supervisor': r.profiles?.full_name || 'N/A',
         'Sector': r.sector_name,
-        'Municipio': r.municipio || '',
+        'Provincia': r.provincia || r.municipio || '',
         'Barrio': r.barrio || '',
         'Hora Inicio': r.hora_inicio || '',
         'Hora Fin': r.hora_fin || '',
@@ -151,7 +152,7 @@ export default function AdminRutas() {
         'Clientes Registrados': r.clients?.length || 0,
         'Calificación (1-10)': r.sector_rating,
         'Nivel': RATING_LABELS[r.sector_rating] || '',
-        'Estado Ruta': r.status || 'Activo',
+        'Estado Ruta': r.status || 'Cerrada',
         'Motivo Eliminación': r.deletion_reason || '',
         'Observaciones': r.observaciones || ''
       };

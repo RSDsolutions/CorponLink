@@ -24,6 +24,7 @@ export default function AdminClientes() {
         .select(`
           *,
           profiles:asesor_id(full_name),
+          advisors:advisor_id(code, full_name, province),
           route:route_id(id, sector_name, fecha, sector_rating, municipio, barrio)
         `)
         .order('created_at', { ascending: false });
@@ -264,7 +265,7 @@ export default function AdminClientes() {
                         {new Date(c.created_at).toLocaleDateString()}
                       </div>
                       <div style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '0.25rem' }}>
-                        {c.profiles?.full_name || 'N/A'}
+                        {c.advisors ? `${c.advisors.code} - ${c.advisors.full_name}` : c.profiles?.full_name || 'N/A'}
                       </div>
                     </td>
                     <td>

@@ -6,6 +6,7 @@ export default function SupervisorClientes() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [advisorsList, setAdvisorsList] = useState([]);
 
   // Modal Nuevo Cliente
   const [showModal, setShowModal] = useState(false);
@@ -25,6 +26,7 @@ export default function SupervisorClientes() {
     bandwidth: '100 Mbps',
     promotion: 'Ninguna',
     plan_price_no_iva: '',
+    advisor_id: '',
     notes: ''
   };
   const [formData, setFormData] = useState(emptyForm);
@@ -56,6 +58,12 @@ export default function SupervisorClientes() {
 
       if (clientsError) throw clientsError;
       setClients(clientsData || []);
+
+      const { data: advisorsData } = await supabase
+        .from('advisors')
+        .select('*')
+        .eq('supervisor_id', user.id);
+      setAdvisorsList(advisorsData || []);
     } catch (error) {
       console.error('Error fetching clients:', error.message);
     } finally {
@@ -79,7 +87,9 @@ export default function SupervisorClientes() {
         plan_name: planNameFull,
         plan_price_no_iva: formData.plan_price_no_iva ? parseFloat(formData.plan_price_no_iva) : 0,
         status: 'Registrado',
-        asesor_id: user.id
+        asesor_id: user.id, // Legacy compatibility
+        supervisor_id: user.id,
+        advisor_id: formData.advisor_id || null
       }]);
 
       if (error) throw error;
@@ -402,12 +412,27 @@ export default function SupervisorClientes() {
                   marginBottom: '1.25rem',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem',
+                  gap: '0.75rem',
                   fontSize: '0.875rem',
                   color: 'var(--primary)'
                 }}>
                   <User size={16} />
-                  <span><strong>Asesor Responsable:</strong> {currentUser?.email || 'Usuario Autenticado'}</span>
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <strong>Asesor (Vendedor) *</strong>
+                    <select 
+                      name="advisor_id" 
+                      className="form-select" 
+                      style={{ padding: '0.25rem 0.5rem', minWidth: '200px', backgroundColor: 'white' }}
+                      required
+                      value={formData.advisor_id} 
+                      onChange={handleChange}
+                    >
+                      <option value="">Selecciona un asesor...</option>
+                      {advisorsList.map(a => (
+                        <option key={a.id} value={a.id}>{a.code} - {a.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Seccion 1: Datos Personales */}
@@ -470,13 +495,25 @@ export default function SupervisorClientes() {
                     <select name="bank_account_type" className="form-select" value={formData.bank_account_type} onChange={handleChange}>
                       <option value="Ahorros">Ahorros</option>
                       <option value="Corriente">Corriente</option>
-                      <option value="Nequi / Daviplata">Nequi / Daviplata</option>
+                      <option value="Básica">Básica</option>
                       <option value="Otro">Otro</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Banco</label>
-                    <input type="text" name="bank_name" className="form-input" placeholder="Ej: Bancolombia, Davivienda..." value={formData.bank_name} onChange={handleChange} />
+                    <select name="bank_name" className="form-select" value={formData.bank_name} onChange={handleChange}>
+                      <option value="">Seleccione el Banco...</option>
+                      <option value="Pichincha">Banco Pichincha</option>
+                      <option value="Guayaquil">Banco de Guayaquil</option>
+                      <option value="Pacífico">Banco del Pacífico</option>
+                      <option value="Produbanco">Produbanco</option>
+                      <option value="Bolivariano">Banco Bolivariano</option>
+                      <option value="Internacional">Banco Internacional</option>
+                      <option value="Machala">Banco de Machala</option>
+                      <option value="Austro">Banco del Austro</option>
+                      <option value="Cooperativa JEP">Cooperativa JEP</option>
+                      <option value="Otro">Otro</option>
+                    </select>
                   </div>
                 </div>
 

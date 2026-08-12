@@ -31,6 +31,11 @@ export default function Layout({ children, role, userProfile }) {
       <NavLink to="/rutas" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
         <MapPin size={20} /> Rutas
       </NavLink>
+      {role === 'supervisor' && (
+        <NavLink to="/supervisor/asesores" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+          <Users size={20} /> Mis Asesores
+        </NavLink>
+      )}
       {role === 'admin' && (
         <NavLink to="/users" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
           <Users size={20} /> Gestión de Usuarios
