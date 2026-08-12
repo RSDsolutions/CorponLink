@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, getCurrentAuthUser } from '../services/supabase';
 import { Users, X, Save, Plus, AlertTriangle, ShieldCheck, Trash2, Cpu, CreditCard, MapPin, User, Phone, Mail, FileText } from 'lucide-react';
 
 export default function SupervisorClientes() {
@@ -51,7 +51,14 @@ export default function SupervisorClientes() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentAuthUser();
+      if (!user?.id) {
+        setCurrentUser(null);
+        setClients([]);
+        setAdvisorsList([]);
+        return;
+      }
+
       setCurrentUser(user);
 
       const { data: clientsData, error: clientsError } = await supabase
@@ -82,7 +89,12 @@ export default function SupervisorClientes() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentAuthUser();
+      if (!user?.id) {
+        alert('No hay una sesión activa para guardar clientes.');
+        return;
+      }
+
       const planNameFull = `${formData.plan_family} - ${formData.bandwidth}`;
 
       const { error } = await supabase.from('clients').insert([{

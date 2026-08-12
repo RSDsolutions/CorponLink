@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, getCurrentAuthUser } from '../services/supabase';
 import { Users, BarChart, CheckCircle, MapPin } from 'lucide-react';
 
 export default function SupervisorDashboard() {
@@ -9,7 +9,11 @@ export default function SupervisorDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const user = await getCurrentAuthUser();
+        if (!user?.id) {
+          setStats({ totalClients: 0, pendientes: 0, activos: 0, totalRoutes: 0 });
+          return;
+        }
 
         const [{ data: clients }, { data: routes }] = await Promise.all([
           supabase.from('clients').select('status'),

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, getCurrentAuthUser } from '../services/supabase';
 import { MapPin, Plus, X, Save, Star, Calendar, TrendingUp, Clock, Trash2, AlertTriangle, Lock } from 'lucide-react';
 
 const RATING_LABELS = {
@@ -47,7 +47,12 @@ export default function SupervisorRutas() {
   const fetchRoutes = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentAuthUser();
+      if (!user?.id) {
+        setRoutes([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('routes')
         .select('*')
@@ -71,7 +76,12 @@ export default function SupervisorRutas() {
   const handleOpenSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentAuthUser();
+      if (!user?.id) {
+        alert('No hay una sesión activa para abrir rutas.');
+        return;
+      }
+
       const payload = {
         ...openFormData,
         supervisor_id: user.id,

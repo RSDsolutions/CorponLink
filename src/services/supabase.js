@@ -85,6 +85,30 @@ export const clearDemoSession = () => {
   localStorage.removeItem(DEMO_SESSION_KEY);
 };
 
+export const getCurrentDemoUser = () => {
+  const demoSession = getDemoSession();
+  if (!demoSession) return null;
+
+  return {
+    id: demoSession.id,
+    email: demoSession.email,
+    role: demoSession.role,
+    full_name: demoSession.full_name,
+  };
+};
+
+export const getCurrentAuthUser = async () => {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    if (user) return user;
+  } catch (error) {
+    console.warn('No active Supabase auth session, using demo session fallback:', error.message);
+  }
+
+  return getCurrentDemoUser();
+};
+
 export const getDemoProfiles = () => {
   return Object.entries(DEMO_USERS).map(([email, user]) => ({
     id: `demo-${email.replace(/[^a-z0-9]+/g, '-')}`,

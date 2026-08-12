@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
+import { supabase, getCurrentAuthUser } from '../services/supabase';
 import { Users, X, Save, Plus, Trash2, Shield, MapPin } from 'lucide-react';
 
 export default function SupervisorAsesores() {
@@ -15,7 +15,12 @@ export default function SupervisorAsesores() {
   const fetchAdvisors = async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentAuthUser();
+      if (!user?.id) {
+        setAdvisors([]);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('advisors')
         .select('*')
@@ -68,7 +73,12 @@ export default function SupervisorAsesores() {
       return;
     }
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentAuthUser();
+      if (!user?.id) {
+        alert('No hay una sesión activa para guardar asesores.');
+        return;
+      }
+
       const { error } = await supabase.from('advisors').insert([{
         ...formData,
         supervisor_id: user.id
