@@ -50,6 +50,9 @@ export default function AdminUsers() {
               <tr>
                 <th>Nombre del Empleado</th>
                 <th>Rol</th>
+                <th>Cédula</th>
+                <th>Teléfono</th>
+                <th>Dirección</th>
                 <th>Reporta a (Supervisor)</th>
                 <th>Fecha de Creación</th>
               </tr>
@@ -63,6 +66,9 @@ export default function AdminUsers() {
                       {p.role}
                     </span>
                   </td>
+                  <td>{p.document_id || '-'}</td>
+                  <td>{p.phone || '-'}</td>
+                  <td>{p.address || '-'}</td>
                   <td>{p.supervisor?.full_name || '-'}</td>
                   <td>{new Date(p.created_at).toLocaleDateString()}</td>
                 </tr>
