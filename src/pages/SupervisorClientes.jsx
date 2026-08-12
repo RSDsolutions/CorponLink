@@ -442,7 +442,7 @@ export default function SupervisorClientes() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginBottom: '1.25rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Número de Cédula *</label>
-                    <input type="text" name="document_id" className="form-input" required placeholder="Ej: 1098765432" value={formData.document_id} onChange={handleChange} />
+                    <input type="text" name="document_id" className="form-input" required pattern="^[0-9A-Za-z\-]+$" title="Solo letras, números y guiones" placeholder="Ej: 1098765432" value={formData.document_id} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Correo Electrónico</label>
@@ -450,19 +450,19 @@ export default function SupervisorClientes() {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Nombres *</label>
-                    <input type="text" name="first_name" className="form-input" required placeholder="Nombres del cliente" value={formData.first_name} onChange={handleChange} />
+                    <input type="text" name="first_name" className="form-input" required pattern="^[A-Za-zÀ-ÿ\s]+$" title="Solo letras y espacios" placeholder="Nombres del cliente" value={formData.first_name} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Apellidos *</label>
-                    <input type="text" name="last_name" className="form-input" required placeholder="Apellidos del cliente" value={formData.last_name} onChange={handleChange} />
+                    <input type="text" name="last_name" className="form-input" required pattern="^[A-Za-zÀ-ÿ\s]+$" title="Solo letras y espacios" placeholder="Apellidos del cliente" value={formData.last_name} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Número Telefónico del Cliente *</label>
-                    <input type="text" name="phone" className="form-input" required placeholder="Teléfono principal" value={formData.phone} onChange={handleChange} />
+                    <input type="text" name="phone" className="form-input" required pattern="^[0-9+\-\s()]+$" title="Solo números y símbolos telefónicos" placeholder="Teléfono principal" value={formData.phone} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Número Telefónico de Referencia</label>
-                    <input type="text" name="reference_phone" className="form-input" placeholder="Teléfono de familiar/referencia" value={formData.reference_phone} onChange={handleChange} />
+                    <input type="text" name="reference_phone" className="form-input" pattern="^[0-9+\-\s()]*$" title="Solo números y símbolos telefónicos" placeholder="Teléfono de familiar/referencia" value={formData.reference_phone} onChange={handleChange} />
                   </div>
                 </div>
 
@@ -524,22 +524,24 @@ export default function SupervisorClientes() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginBottom: '1rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Familia de Plan *</label>
-                    <select name="plan_family" className="form-select" value={formData.plan_family} onChange={handleChange}>
-                      <option value="Fibra Óptica">Fibra Óptica</option>
-                      <option value="Inalámbrico">Inalámbrico</option>
-                      <option value="Empresarial / Pyme">Empresarial / Pyme</option>
-                    </select>
+                    <input list="plan-families" name="plan_family" className="form-input" required placeholder="Ej: Fibra Óptica, Especial..." value={formData.plan_family} onChange={handleChange} />
+                    <datalist id="plan-families">
+                      <option value="Fibra Óptica" />
+                      <option value="Inalámbrico" />
+                      <option value="Empresarial / Pyme" />
+                    </datalist>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Ancho de Banda *</label>
-                    <select name="bandwidth" className="form-select" value={formData.bandwidth} onChange={handleChange}>
-                      <option value="50 Mbps">50 Mbps</option>
-                      <option value="100 Mbps">100 Mbps</option>
-                      <option value="200 Mbps">200 Mbps</option>
-                      <option value="300 Mbps">300 Mbps</option>
-                      <option value="500 Mbps">500 Mbps</option>
-                      <option value="1 Gbps">1 Gbps</option>
-                    </select>
+                    <input list="bandwidths" name="bandwidth" className="form-input" required placeholder="Ej: 100 Mbps, 2 Gbps..." value={formData.bandwidth} onChange={handleChange} />
+                    <datalist id="bandwidths">
+                      <option value="50 Mbps" />
+                      <option value="100 Mbps" />
+                      <option value="200 Mbps" />
+                      <option value="300 Mbps" />
+                      <option value="500 Mbps" />
+                      <option value="1 Gbps" />
+                    </datalist>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Promoción</label>
