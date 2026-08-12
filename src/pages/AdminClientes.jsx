@@ -330,9 +330,13 @@ export default function AdminClientes() {
                       )}
                     </td>
                     <td>
-                      <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }}>
-                        Estado
-                      </button>
+                      {!isEliminado ? (
+                        <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }}>
+                          Estado
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin acciones</span>
+                      )}
                     </td>
                   </tr>
                 );

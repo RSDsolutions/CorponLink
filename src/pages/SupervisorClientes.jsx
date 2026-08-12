@@ -357,11 +357,11 @@ export default function SupervisorClientes() {
                       )}
                     </td>
                     <td>
-                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
-                        <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }}>
-                          Estado
-                        </button>
-                        {!isEliminado && (
+                      {!isEliminado ? (
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
+                          <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }}>
+                            Estado
+                          </button>
                           <button
                             className="btn btn-sm"
                             style={{ backgroundColor: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', border: 'none' }}
@@ -373,8 +373,10 @@ export default function SupervisorClientes() {
                           >
                             <Trash2 size={13} /> Eliminar
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin acciones</span>
+                      )}
                     </td>
                   </tr>
                 );
