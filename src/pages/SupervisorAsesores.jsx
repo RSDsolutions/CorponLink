@@ -40,8 +40,25 @@ export default function SupervisorAsesores() {
   };
 
   const generateCode = () => {
-    const num = Math.floor(100 + Math.random() * 900);
-    setFormData({ ...formData, code: `${formData.province}-${num}` });
+    const provinceAdvisors = advisors.filter(a => a.province === formData.province);
+    let maxSequence = 0;
+    
+    provinceAdvisors.forEach(a => {
+      if (a.code && a.code.startsWith(`${formData.province}-`)) {
+        const parts = a.code.split('-');
+        if (parts.length > 1) {
+          const numPart = parseInt(parts[1], 10);
+          if (!isNaN(numPart) && numPart > maxSequence) {
+            maxSequence = numPart;
+          }
+        }
+      }
+    });
+
+    const nextSequence = maxSequence + 1;
+    const paddedSequence = nextSequence.toString().padStart(3, '0');
+    
+    setFormData({ ...formData, code: `${formData.province}-${paddedSequence}` });
   };
 
   const handleSubmit = async (e) => {
