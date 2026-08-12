@@ -373,7 +373,7 @@ h1, h2, h3, h4 {
 .badge-contactado { background: var(--status-info-bg); color: var(--status-info-text); }
 .badge-programado { background: var(--status-warning-bg); color: var(--status-warning-text); }
 .badge-activo { background: var(--status-success-bg); color: var(--status-success-text); }
-.badge-cancelado, .badge-rechazado { background: var(--status-danger-bg); color: var(--status-danger-text); }
+.badge-cancelado, .badge-rechazado, .badge-eliminado { background: var(--status-danger-bg); color: var(--status-danger-text); }
 
 /* Forms & Inputs */
 .form-group {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { MapPin, Star, Calendar, Download, Search, TrendingUp, ChevronDown, ChevronRight, Users, Clock } from 'lucide-react';
+import { MapPin, Star, Calendar, Download, Search, TrendingUp, ChevronDown, ChevronRight, Users, Clock, Trash2, AlertTriangle, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 const RATING_LABELS = {
@@ -31,10 +31,14 @@ export default function AdminRutas() {
   const [supervisors, setSupervisors] = useState([]);
   const [expandedRoutes, setExpandedRoutes] = useState({});
 
+  // Soft delete modal for route
+  const [routeToDelete, setRouteToDelete] = useState(null);
+  const [deletionReason, setDeletionReason] = useState('Eliminado por mala digitación');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
   const fetchRoutes = async () => {
     setLoading(true);
     try {
-      // Query 1: all routes with supervisor profile
       const { data: routesData, error: routesError } = await supabase
         .from('routes')
         .select('*, profiles:supervisor_id(full_name)')
@@ -42,7 +46,6 @@ export default function AdminRutas() {
 
       if (routesError) throw routesError;
 
-      // Query 2: all clients that have a route_id (to avoid FK embed issues)
       const { data: clientsData, error: clientsError } = await supabase
         .from('clients')
         .select('id, first_name, last_name, document_id, phone, plan_name, status, route_id')
@@ -50,17 +53,15 @@ export default function AdminRutas() {
 
       if (clientsError) throw clientsError;
 
-      // Combine: attach clients array to each route
-      const combined = routesData.map(route => ({
+      const combined = (routesData || []).map(route => ({
         ...route,
-        clients: clientsData.filter(c => c.route_id === route.id)
+        clients: (clientsData || []).filter(c => c.route_id === route.id)
       }));
 
       setRoutes(combined);
 
-      // Extract unique supervisors for filter dropdown
       const uniqueSups = [...new Map(
-        routesData.map(r => [r.supervisor_id, r.profiles?.full_name])
+        (routesData || []).map(r => [r.supervisor_id, r.profiles?.full_name])
       ).entries()].map(([id, name]) => ({ id, name }));
       setSupervisors(uniqueSups);
     } catch (error) {
@@ -72,11 +73,32 @@ export default function AdminRutas() {
 
   useEffect(() => { fetchRoutes(); }, []);
 
+  const confirmSoftDeleteRoute = async () => {
+    if (!routeToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('routes')
+        .update({
+          status: 'Eliminado',
+          deletion_reason: deletionReason || 'Eliminado por mala digitación'
+        })
+        .eq('id', routeToDelete.id);
+
+      if (error) throw error;
+      setShowDeleteModal(false);
+      setRouteToDelete(null);
+      fetchRoutes();
+    } catch (error) {
+      alert('Error al realizar borrado lógico de ruta: ' + error.message);
+    }
+  };
+
   const filteredRoutes = routes.filter(r => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      r.sector_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (r.municipio && r.municipio.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (r.barrio && r.barrio.toLowerCase().includes(searchTerm.toLowerCase()));
+      (r.sector_name || '').toLowerCase().includes(searchLower) ||
+      (r.municipio && r.municipio.toLowerCase().includes(searchLower)) ||
+      (r.barrio && r.barrio.toLowerCase().includes(searchLower));
     
     const matchesSupervisor = supervisorFilter === '' || r.supervisor_id === supervisorFilter;
     
@@ -102,11 +124,13 @@ export default function AdminRutas() {
     return matchesSearch && matchesSupervisor && matchesDate;
   });
 
-  const avgRating = filteredRoutes.length > 0
-    ? (filteredRoutes.reduce((sum, r) => sum + r.sector_rating, 0) / filteredRoutes.length).toFixed(1)
+  const activeRoutes = filteredRoutes.filter(r => r.status !== 'Eliminado');
+  const avgRating = activeRoutes.length > 0
+    ? (activeRoutes.reduce((sum, r) => sum + r.sector_rating, 0) / activeRoutes.length).toFixed(1)
     : 0;
-  const totalVentas = filteredRoutes.reduce((sum, r) => sum + (r.total_ventas || 0), 0);
-  const totalClientes = filteredRoutes.reduce((sum, r) => sum + (r.clients?.length || 0), 0);
+  const totalVentas = activeRoutes.reduce((sum, r) => sum + (r.total_ventas || 0), 0);
+  const totalClientes = activeRoutes.reduce((sum, r) => sum + (r.clients?.length || 0), 0);
+  const totalEliminadas = filteredRoutes.filter(r => r.status === 'Eliminado').length;
 
   const toggleExpand = (id) => setExpandedRoutes(prev => ({ ...prev, [id]: !prev[id] }));
 
@@ -127,6 +151,8 @@ export default function AdminRutas() {
         'Clientes Registrados': r.clients?.length || 0,
         'Calificación (1-10)': r.sector_rating,
         'Nivel': RATING_LABELS[r.sector_rating] || '',
+        'Estado Ruta': r.status || 'Activo',
+        'Motivo Eliminación': r.deletion_reason || '',
         'Observaciones': r.observaciones || ''
       };
       if (r.clients && r.clients.length > 0) {
@@ -148,7 +174,7 @@ export default function AdminRutas() {
     worksheet['!cols'] = [
       { wch: 12 }, { wch: 25 }, { wch: 25 }, { wch: 18 }, { wch: 18 },
       { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 18 },
-      { wch: 15 }, { wch: 14 }, { wch: 40 },
+      { wch: 15 }, { wch: 14 }, { wch: 12 }, { wch: 28 }, { wch: 40 },
       { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 15 }
     ];
     const workbook = XLSX.utils.book_new();
@@ -160,8 +186,8 @@ export default function AdminRutas() {
     <div>
       <div className="page-header">
         <div>
-          <h2>Rutas</h2>
-          <p className="text-muted">Historial de rutas con clientes enlazados por sector.</p>
+          <h2>Administración de Rutas</h2>
+          <p className="text-muted">Historial global de sectores, calificaciones y borrado lógico.</p>
         </div>
         <button className="btn btn-primary" onClick={exportToExcel} style={{ backgroundColor: 'var(--status-success-text)' }}>
           <Download size={18} /> Descargar Excel
@@ -172,8 +198,8 @@ export default function AdminRutas() {
       <div className="kpi-grid">
         <div className="kpi-card">
           <div className="kpi-icon blue"><MapPin size={24} /></div>
-          <div className="kpi-value">{filteredRoutes.length}</div>
-          <div className="kpi-label">Rutas Registradas</div>
+          <div className="kpi-value">{activeRoutes.length}</div>
+          <div className="kpi-label">Rutas Activas</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-icon yellow"><Star size={24} /></div>
@@ -186,11 +212,9 @@ export default function AdminRutas() {
           <div className="kpi-label">Ventas Reportadas</div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-icon blue" style={{ background: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6' }}>
-            <Users size={24} />
-          </div>
-          <div className="kpi-value">{totalClientes}</div>
-          <div className="kpi-label">Clientes en Rutas</div>
+          <div className="kpi-icon red"><Trash2 size={24} /></div>
+          <div className="kpi-value">{totalEliminadas}</div>
+          <div className="kpi-label">Rutas Eliminadas</div>
         </div>
       </div>
 
@@ -233,136 +257,181 @@ export default function AdminRutas() {
 
           {!loading && filteredRoutes.length === 0 && (
             <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-              No hay rutas registradas aún.
+              No hay rutas registradas.
             </div>
           )}
 
-          {filteredRoutes.map(r => (
-            <div key={r.id} style={{
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              marginBottom: '0.75rem',
-              overflow: 'hidden',
-              transition: 'box-shadow 0.2s ease'
-            }}>
-              {/* Cabecera clickeable */}
-              <div
-                onClick={() => toggleExpand(r.id)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  padding: '1rem 1.25rem',
-                  cursor: 'pointer',
-                  background: expandedRoutes[r.id] ? 'rgba(79, 70, 229, 0.04)' : 'transparent',
-                  flexWrap: 'wrap'
-                }}
-              >
-                {/* Info principal */}
-                <div style={{ flex: 1, minWidth: '180px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                    <MapPin size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.sector_name}</span>
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{r.profiles?.full_name}</span>
-                    <span>·</span>
-                    <span>
-                      <Calendar size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />
-                      {new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
-                    </span>
-                    {(r.hora_inicio || r.hora_fin) && (
-                      <>
-                        <span>·</span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <Clock size={11} />
-                          {formatTime(r.hora_inicio)} {r.hora_fin ? `→ ${formatTime(r.hora_fin)}` : ''}
+          {filteredRoutes.map(r => {
+            const isEliminada = r.status === 'Eliminado';
+
+            return (
+              <div key={r.id} style={{
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-lg)',
+                marginBottom: '0.75rem',
+                overflow: 'hidden',
+                opacity: isEliminada ? 0.7 : 1,
+                backgroundColor: isEliminada ? 'rgba(239, 68, 68, 0.03)' : 'transparent',
+                transition: 'box-shadow 0.2s ease'
+              }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem',
+                    padding: '1rem 1.25rem',
+                    cursor: 'pointer',
+                    background: expandedRoutes[r.id] ? 'rgba(79, 70, 229, 0.04)' : 'transparent',
+                    flexWrap: 'wrap'
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: '180px' }} onClick={() => toggleExpand(r.id)}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                      <MapPin size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                      <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.sector_name}</span>
+                      {isEliminada && (
+                        <span className="badge badge-eliminado" style={{ fontSize: '0.7rem' }}>
+                          Eliminada ({r.deletion_reason || 'Borrado lógico'})
                         </span>
-                      </>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{r.profiles?.full_name}</span>
+                      <span>·</span>
+                      <span>
+                        <Calendar size={11} style={{ display: 'inline', verticalAlign: 'middle', marginRight: 2 }} />
+                        {new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                      {(r.hora_inicio || r.hora_fin) && (
+                        <>
+                          <span>·</span>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                            <Clock size={11} />
+                            {formatTime(r.hora_inicio)} {r.hora_fin ? `→ ${formatTime(r.hora_fin)}` : ''}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Métricas */}
+                  <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexShrink: 0 }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem' }}>{r.total_visitas || 0}</div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Visitas</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--status-success-text)' }}>{r.total_ventas || 0}</div>
+                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Ventas</div>
+                    </div>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: '50%',
+                      background: getRatingColor(r.sector_rating),
+                      color: 'white', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem',
+                      flexShrink: 0
+                    }}>
+                      {r.sector_rating}
+                    </div>
+
+                    {!isEliminada && (
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ backgroundColor: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', border: 'none' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRouteToDelete(r);
+                          setDeletionReason('Eliminado por mala digitación');
+                          setShowDeleteModal(true);
+                        }}
+                      >
+                        <Trash2 size={14} /> Eliminar
+                      </button>
                     )}
-                    {r.municipio && <span>· {[r.municipio, r.barrio].filter(Boolean).join(', ')}</span>}
+
+                    <div onClick={() => toggleExpand(r.id)}>
+                      {expandedRoutes[r.id]
+                        ? <ChevronDown size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        : <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      }
+                    </div>
                   </div>
                 </div>
 
-                {/* Métricas */}
-                <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexShrink: 0 }}>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{r.total_visitas || 0}</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Visitas</div>
+                {/* Detalle expandible */}
+                {expandedRoutes[r.id] && (
+                  <div style={{ borderTop: '1px solid var(--border)', backgroundColor: 'rgba(248, 250, 252, 0.8)' }}>
+                    {r.observaciones && (
+                      <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'white' }}>
+                        <strong>Observaciones:</strong> {r.observaciones}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--status-success-text)' }}>{r.total_ventas || 0}</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Ventas</div>
-                  </div>
-                  <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', color: '#8b5cf6' }}>{r.clients?.length || 0}</div>
-                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Clientes</div>
-                  </div>
-                  {/* Rating badge */}
-                  <div style={{
-                    width: 38, height: 38, borderRadius: '50%',
-                    background: getRatingColor(r.sector_rating),
-                    color: 'white', display: 'flex', alignItems: 'center',
-                    justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem',
-                    flexShrink: 0
-                  }}>
-                    {r.sector_rating}
-                  </div>
-                  {expandedRoutes[r.id]
-                    ? <ChevronDown size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                    : <ChevronRight size={16} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                  }
-                </div>
+                )}
               </div>
-
-              {/* Clientes de la ruta — expandible */}
-              {expandedRoutes[r.id] && (
-                <div style={{ borderTop: '1px solid var(--border)', backgroundColor: 'rgba(248, 250, 252, 0.8)' }}>
-                  {r.clients && r.clients.length > 0 ? (
-                    <div className="table-responsive">
-                      <table className="table" style={{ margin: 0 }}>
-                        <thead>
-                          <tr>
-                            <th style={{ paddingLeft: '2rem' }}>Cliente</th>
-                            <th>Doc. Identidad</th>
-                            <th>Teléfono</th>
-                            <th>Plan</th>
-                            <th>Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {r.clients.map(c => (
-                            <tr key={c.id}>
-                              <td style={{ paddingLeft: '2rem' }}>
-                                <div className="client-name">{c.first_name} {c.last_name}</div>
-                              </td>
-                              <td><div className="client-doc">{c.document_id}</div></td>
-                              <td><div style={{ fontSize: '0.875rem' }}>{c.phone}</div></td>
-                              <td><div style={{ fontSize: '0.875rem' }}>{c.plan_name}</div></td>
-                              <td>
-                                <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div style={{ padding: '1.25rem 2rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontStyle: 'italic' }}>
-                      No hay clientes registrados en esta ruta aún.
-                    </div>
-                  )}
-                  {r.observaciones && (
-                    <div style={{ padding: '0.75rem 1.5rem', borderTop: '1px solid var(--border)', fontSize: '0.8rem', color: 'var(--text-muted)', background: 'white' }}>
-                      <strong>Observaciones:</strong> {r.observaciones}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
+      {/* Modal Confirmar Borrado Lógico de Ruta */}
+      {showDeleteModal && routeToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--status-danger-text)' }}>
+                <AlertTriangle size={22} />
+                <h3 style={{ margin: 0, color: 'var(--status-danger-text)' }}>¿Está seguro de eliminar?</h3>
+              </div>
+              <button onClick={() => setShowDeleteModal(false)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+                La ruta del sector <strong>{routeToDelete.sector_name}</strong> será cambiada al estado de borrado lógico (<strong>Eliminada</strong>).
+              </p>
+
+              <div style={{
+                padding: '0.875rem',
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '1.25rem',
+                fontSize: '0.85rem'
+              }}>
+                <label className="form-label" style={{ color: 'var(--status-danger-text)', fontWeight: 600 }}>
+                  Motivo de Eliminación:
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={deletionReason}
+                  onChange={(e) => setDeletionReason(e.target.value)}
+                  placeholder="Motivo de eliminación..."
+                  required
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'block' }}>
+                  Se asignará como motivo: <em>Eliminado por mala digitación</em>.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ backgroundColor: 'var(--status-danger-text)', color: 'white' }}
+                  onClick={confirmSoftDeleteRoute}
+                >
+                  <Trash2 size={16} /> Confirmar Eliminación
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

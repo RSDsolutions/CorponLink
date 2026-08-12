@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { MapPin, Plus, X, Save, Star, Calendar, TrendingUp, Clock } from 'lucide-react';
+import { MapPin, Plus, X, Save, Star, Calendar, TrendingUp, Clock, Trash2, AlertTriangle } from 'lucide-react';
 
 const RATING_LABELS = {
   1: 'Muy Malo', 2: 'Malo', 3: 'Regular', 4: 'Bueno', 5: 'Bueno+',
@@ -18,6 +18,11 @@ export default function SupervisorRutas() {
   const [routes, setRoutes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+
+  // Modal Borrado Lógico de Ruta
+  const [routeToDelete, setRouteToDelete] = useState(null);
+  const [deletionReason, setDeletionReason] = useState('Eliminado por mala digitación');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [formData, setFormData] = useState({
     fecha: new Date().toISOString().split('T')[0],
@@ -42,7 +47,7 @@ export default function SupervisorRutas() {
         .eq('supervisor_id', user.id)
         .order('fecha', { ascending: false });
       if (error) throw error;
-      setRoutes(data);
+      setRoutes(data || []);
     } catch (error) {
       console.error('Error fetching routes:', error.message);
     } finally {
@@ -61,6 +66,7 @@ export default function SupervisorRutas() {
       const payload = {
         ...formData,
         supervisor_id: user.id,
+        status: 'Activo',
         sector_rating: parseInt(formData.sector_rating),
         total_visitas: parseInt(formData.total_visitas) || 0,
         total_ventas: parseInt(formData.total_ventas) || 0,
@@ -80,18 +86,41 @@ export default function SupervisorRutas() {
     }
   };
 
-  const totalRoutes = routes.length;
-  const avgRating = routes.length > 0
-    ? (routes.reduce((sum, r) => sum + r.sector_rating, 0) / routes.length).toFixed(1)
+  // Confirmar Borrado Lógico de Ruta
+  const confirmSoftDeleteRoute = async () => {
+    if (!routeToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('routes')
+        .update({
+          status: 'Eliminado',
+          deletion_reason: deletionReason || 'Eliminado por mala digitación'
+        })
+        .eq('id', routeToDelete.id);
+
+      if (error) throw error;
+      setShowDeleteModal(false);
+      setRouteToDelete(null);
+      fetchRoutes();
+    } catch (error) {
+      alert('Error al realizar borrado lógico de ruta: ' + error.message);
+    }
+  };
+
+  const activeRoutes = routes.filter(r => r.status !== 'Eliminado');
+  const totalRoutes = activeRoutes.length;
+  const avgRating = activeRoutes.length > 0
+    ? (activeRoutes.reduce((sum, r) => sum + r.sector_rating, 0) / activeRoutes.length).toFixed(1)
     : 0;
-  const totalVentas = routes.reduce((sum, r) => sum + (r.total_ventas || 0), 0);
+  const totalVentas = activeRoutes.reduce((sum, r) => sum + (r.total_ventas || 0), 0);
+  const totalEliminadas = routes.filter(r => r.status === 'Eliminado').length;
 
   return (
     <div>
       <div className="page-header">
         <div>
-          <h2>Rutas</h2>
-          <p className="text-muted">Registro diario de sectores visitados y su calificación.</p>
+          <h2>Gestión de Rutas</h2>
+          <p className="text-muted">Registro independiente de sectores visitados y su desempeño.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={18} /> Registrar Ruta
@@ -103,7 +132,7 @@ export default function SupervisorRutas() {
         <div className="kpi-card">
           <div className="kpi-icon blue"><MapPin size={24} /></div>
           <div className="kpi-value">{totalRoutes}</div>
-          <div className="kpi-label">Rutas Registradas</div>
+          <div className="kpi-label">Rutas Activas</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-icon yellow"><Star size={24} /></div>
@@ -114,6 +143,11 @@ export default function SupervisorRutas() {
           <div className="kpi-icon green"><TrendingUp size={24} /></div>
           <div className="kpi-value">{totalVentas}</div>
           <div className="kpi-label">Ventas en Rutas</div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-icon red"><Trash2 size={24} /></div>
+          <div className="kpi-value">{totalEliminadas}</div>
+          <div className="kpi-label">Rutas Eliminadas</div>
         </div>
       </div>
 
@@ -130,67 +164,99 @@ export default function SupervisorRutas() {
                 <th>Sector / Ubicación</th>
                 <th>Visitas / Ventas</th>
                 <th>Calificación</th>
-                <th>Observaciones</th>
+                <th>Observaciones / Estado</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {routes.map(r => (
-                <tr key={r.id}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
-                      <Calendar size={13} style={{ color: 'var(--text-muted)' }} />
-                      <span style={{ fontSize: '0.875rem' }}>
-                        {new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </span>
-                    </div>
-                    {(r.hora_inicio || r.hora_fin) && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        <Clock size={11} />
-                        {r.hora_inicio || '--'} → {r.hora_fin || '--'}
+              {routes.map(r => {
+                const isEliminada = r.status === 'Eliminado';
+
+                return (
+                  <tr key={r.id} style={{ opacity: isEliminada ? 0.7 : 1, backgroundColor: isEliminada ? 'rgba(239, 68, 68, 0.03)' : 'transparent' }}>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.25rem' }}>
+                        <Calendar size={13} style={{ color: 'var(--text-muted)' }} />
+                        <span style={{ fontSize: '0.875rem' }}>
+                          {new Date(r.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
                       </div>
-                    )}
-                  </td>
-                  <td>
-                    <div className="client-name">{r.sector_name}</div>
-                    <div className="client-doc">
-                      {[r.municipio, r.barrio].filter(Boolean).join(' · ')}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 700, fontSize: '1.125rem' }}>{r.total_visitas}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Visitas</div>
+                      {(r.hora_inicio || r.hora_fin) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          <Clock size={11} />
+                          {r.hora_inicio || '--'} → {r.hora_fin || '--'}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <div className="client-name">{r.sector_name}</div>
+                      <div className="client-doc">
+                        {[r.municipio, r.barrio].filter(Boolean).join(' · ')}
                       </div>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--status-success-text)' }}>{r.total_ventas}</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Ventas</div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontWeight: 700, fontSize: '1.125rem' }}>{r.total_visitas}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Visitas</div>
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontWeight: 700, fontSize: '1.125rem', color: 'var(--status-success-text)' }}>{r.total_ventas}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Ventas</div>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: '50%',
-                        background: getRatingColor(r.sector_rating),
-                        color: 'white', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem'
-                      }}>
-                        {r.sector_rating}
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: '50%',
+                          background: getRatingColor(r.sector_rating),
+                          color: 'white', display: 'flex', alignItems: 'center',
+                          justifyContent: 'center', fontWeight: 700, fontSize: '0.875rem'
+                        }}>
+                          {r.sector_rating}
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{RATING_LABELS[r.sector_rating]}</span>
                       </div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{RATING_LABELS[r.sector_rating]}</span>
-                    </div>
-                  </td>
-                  <td style={{ maxWidth: '220px' }}>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.observaciones || <span style={{ fontStyle: 'italic' }}>Sin observaciones</span>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td style={{ maxWidth: '220px' }}>
+                      {isEliminada ? (
+                        <div>
+                          <span className="badge badge-eliminado">Eliminada</span>
+                          {r.deletion_reason && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--status-danger-text)', marginTop: '0.2rem' }}>
+                              Motivo: {r.deletion_reason}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {r.observaciones || <span style={{ fontStyle: 'italic' }}>Sin observaciones</span>}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {!isEliminada && (
+                        <button
+                          type="button"
+                          className="btn btn-sm"
+                          style={{ backgroundColor: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', border: 'none' }}
+                          onClick={() => {
+                            setRouteToDelete(r);
+                            setDeletionReason('Eliminado por mala digitación');
+                            setShowDeleteModal(true);
+                          }}
+                        >
+                          <Trash2 size={14} /> Eliminar
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {routes.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
                     No hay rutas registradas. ¡Registra tu primera ruta del día!
                   </td>
                 </tr>
@@ -212,7 +278,6 @@ export default function SupervisorRutas() {
             </div>
             <div className="modal-body">
               <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-
                 <div className="form-group">
                   <label className="form-label">Fecha de la Ruta</label>
                   <input type="date" name="fecha" className="form-input" required value={formData.fecha} onChange={handleChange} />
@@ -284,7 +349,7 @@ export default function SupervisorRutas() {
                   <label className="form-label">Observaciones del Sector</label>
                   <textarea
                     name="observaciones" className="form-textarea" rows="3"
-                    placeholder="Condiciones del sector, receptividad de la gente, recomendaciones para próximas visitas..."
+                    placeholder="Condiciones del sector, receptividad de la gente, recomendaciones..."
                     value={formData.observaciones} onChange={handleChange}
                   ></textarea>
                 </div>
@@ -294,6 +359,64 @@ export default function SupervisorRutas() {
                   <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar Ruta</button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Borrado Lógico de Ruta */}
+      {showDeleteModal && routeToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--status-danger-text)' }}>
+                <AlertTriangle size={22} />
+                <h3 style={{ margin: 0, color: 'var(--status-danger-text)' }}>¿Está seguro de eliminar?</h3>
+              </div>
+              <button onClick={() => setShowDeleteModal(false)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', marginBottom: '1rem' }}>
+                La ruta del sector <strong>{routeToDelete.sector_name}</strong> ({routeToDelete.fecha}) cambiará a estado de borrado lógico (<strong>Eliminada</strong>).
+              </p>
+
+              <div style={{
+                padding: '0.875rem',
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '1.25rem',
+                fontSize: '0.85rem'
+              }}>
+                <label className="form-label" style={{ color: 'var(--status-danger-text)', fontWeight: 600 }}>
+                  Motivo de Eliminación:
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={deletionReason}
+                  onChange={(e) => setDeletionReason(e.target.value)}
+                  placeholder="Motivo de eliminación..."
+                  required
+                />
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem', display: 'block' }}>
+                  Se asignará como motivo: <em>Eliminado por mala digitación</em>.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ backgroundColor: 'var(--status-danger-text)', color: 'white' }}
+                  onClick={confirmSoftDeleteRoute}
+                >
+                  <Trash2 size={16} /> Confirmar Eliminación
+                </button>
+              </div>
             </div>
           </div>
         </div>

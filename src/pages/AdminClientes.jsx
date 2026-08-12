@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { Download, Search, Globe, Users, CheckCircle, MapPin } from 'lucide-react';
+import { Download, Search, Globe, Users, CheckCircle, MapPin, Trash2, Cpu, CreditCard, AlertTriangle, X, Save } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function AdminClientes() {
@@ -8,8 +8,14 @@ export default function AdminClientes() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [sectorFilter, setSectorFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+
+  // Modal Estado / Soft Delete
+  const [editingClient, setEditingClient] = useState(null);
+  const [newStatus, setNewStatus] = useState('');
+  const [deletionReason, setDeletionReason] = useState('Eliminado por mala digitación');
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState(null);
 
   const fetchClients = async () => {
     try {
@@ -22,7 +28,7 @@ export default function AdminClientes() {
         `)
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setClients(data);
+      setClients(data || []);
     } catch (error) {
       console.error('Error fetching clients:', error.message);
     } finally {
@@ -32,16 +38,22 @@ export default function AdminClientes() {
 
   useEffect(() => { fetchClients(); }, []);
 
-  // Sectores únicos para filtrar
-  const uniqueSectors = [...new Set(clients.map(c => c.route?.sector_name).filter(Boolean))];
-
   const filteredClients = clients.filter(c => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      c.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.document_id.includes(searchTerm);
-    const matchesStatus = statusFilter === '' || c.status === statusFilter;
-    const matchesSector = sectorFilter === '' || c.route?.sector_name === sectorFilter;
+      (c.first_name || '').toLowerCase().includes(searchLower) ||
+      (c.last_name || '').toLowerCase().includes(searchLower) ||
+      (c.document_id || '').includes(searchTerm) ||
+      (c.phone || '').includes(searchTerm) ||
+      (c.email || '').toLowerCase().includes(searchLower);
+
+    let matchesStatus = true;
+    if (statusFilter !== '') {
+      matchesStatus = c.status === statusFilter;
+    } else {
+      // Por defecto no ocultamos, pero el filtro permite elegir
+      matchesStatus = true;
+    }
     
     let matchesDate = true;
     if (dateFilter !== 'all') {
@@ -64,37 +76,93 @@ export default function AdminClientes() {
       }
     }
     
-    return matchesSearch && matchesStatus && matchesSector && matchesDate;
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
-  const total = filteredClients.length;
-  const activos = filteredClients.filter(c => c.status === 'Activo').length;
-  const pendientes = filteredClients.filter(c => ['Registrado', 'Contactado', 'Programado'].includes(c.status)).length;
+  const activeClients = filteredClients.filter(c => c.status !== 'Eliminado');
+  const total = activeClients.length;
+  const activos = activeClients.filter(c => c.status === 'Activo').length;
+  const pendientes = activeClients.filter(c => ['Registrado', 'Contactado', 'Programado'].includes(c.status)).length;
+  const eliminados = filteredClients.filter(c => c.status === 'Eliminado').length;
+
+  const handleStatusChange = async (e) => {
+    e.preventDefault();
+    if (newStatus === 'Eliminado') {
+      setClientToDelete(editingClient);
+      setDeletionReason('Eliminado por mala digitación');
+      setShowDeleteConfirmModal(true);
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ status: newStatus })
+        .eq('id', editingClient.id);
+
+      if (error) throw error;
+      setEditingClient(null);
+      fetchClients();
+    } catch (error) {
+      alert('Error actualizando estado: ' + error.message);
+    }
+  };
+
+  const confirmSoftDeleteClient = async () => {
+    if (!clientToDelete) return;
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          status: 'Eliminado',
+          deletion_reason: deletionReason || 'Eliminado por mala digitación'
+        })
+        .eq('id', clientToDelete.id);
+
+      if (error) throw error;
+      setShowDeleteConfirmModal(false);
+      setClientToDelete(null);
+      setEditingClient(null);
+      fetchClients();
+    } catch (error) {
+      alert('Error al eliminar cliente: ' + error.message);
+    }
+  };
 
   const exportToExcel = () => {
     if (filteredClients.length === 0) return;
     const exportData = filteredClients.map(c => ({
       'Fecha de Registro': new Date(c.created_at).toLocaleDateString(),
-      'Supervisor': c.profiles?.full_name || 'Desconocido',
+      'Asesor': c.profiles?.full_name || 'N/A',
+      'Cédula': c.document_id,
       'Nombres': c.first_name,
       'Apellidos': c.last_name,
-      'Documento de Identidad': c.document_id,
-      'Teléfono': c.phone,
-      'Dirección': c.address,
-      'Plan Contratado': c.plan_name,
+      'Correo Electrónico': c.email || '',
+      'Teléfono Cliente': c.phone,
+      'Teléfono Referencia': c.reference_phone || '',
+      'Calle Principal y Secundaria': c.address,
+      'Referencia Vivienda': c.housing_reference || '',
+      'Banco': c.bank_name || '',
+      'Tipo de Cuenta': c.bank_account_type || '',
+      'Número de Cuenta': c.bank_account_number || '',
+      'Familia Plan': c.plan_family || '',
+      'Ancho de Banda': c.bandwidth || '',
+      'Promoción': c.promotion || '',
+      'Valor sin IVA ($)': c.plan_price_no_iva || '',
+      'CA': c.ca || '',
+      'BA': c.ba || '',
+      'NPC': c.npc || '',
       'Estado Actual': c.status,
-      'Sector de Ruta': c.route?.sector_name || '',
-      'Municipio': c.route?.municipio || '',
-      'Barrio': c.route?.barrio || '',
-      'Fecha de Ruta': c.route ? new Date(c.route.fecha + 'T00:00:00').toLocaleDateString() : '',
-      'Calificación Sector (1-10)': c.route?.sector_rating || '',
+      'Motivo Eliminación': c.deletion_reason || '',
       'Notas': c.notes || ''
     }));
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     worksheet['!cols'] = [
-      { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 20 }, { wch: 18 },
-      { wch: 15 }, { wch: 40 }, { wch: 20 }, { wch: 15 }, { wch: 25 },
-      { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 18 }, { wch: 50 }
+      { wch: 15 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
+      { wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 35 }, { wch: 30 },
+      { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 15 },
+      { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+      { wch: 15 }, { wch: 30 }, { wch: 30 }
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Clientes CorponNet');
@@ -105,8 +173,8 @@ export default function AdminClientes() {
     <div>
       <div className="page-header">
         <div>
-          <h2>Clientes</h2>
-          <p className="text-muted">Vista global de todos los clientes con su ruta asociada.</p>
+          <h2>Administración de Clientes</h2>
+          <p className="text-muted">Vista global de clientes, datos financieros, técnicos y borrado lógico.</p>
         </div>
         <button className="btn btn-primary" onClick={exportToExcel} style={{ backgroundColor: 'var(--status-success-text)' }}>
           <Download size={18} /> Descargar Excel (.xlsx)
@@ -118,7 +186,7 @@ export default function AdminClientes() {
         <div className="kpi-card">
           <div className="kpi-icon blue"><Globe size={24} /></div>
           <div className="kpi-value">{total}</div>
-          <div className="kpi-label">Total Clientes</div>
+          <div className="kpi-label">Total Clientes Activos</div>
         </div>
         <div className="kpi-card">
           <div className="kpi-icon green"><CheckCircle size={24} /></div>
@@ -130,15 +198,20 @@ export default function AdminClientes() {
           <div className="kpi-value">{pendientes}</div>
           <div className="kpi-label">En Proceso / Por Instalar</div>
         </div>
+        <div className="kpi-card">
+          <div className="kpi-icon red"><Trash2 size={24} /></div>
+          <div className="kpi-value">{eliminados}</div>
+          <div className="kpi-label">Eliminados (Borrado Lógico)</div>
+        </div>
       </div>
 
       {/* Tabla con filtros */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 2, minWidth: '250px' }}>
+          <div style={{ position: 'relative', flex: 2, minWidth: '240px' }}>
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
-              type="text" className="form-input" placeholder="Buscar por nombre o documento..."
+              type="text" className="form-input" placeholder="Buscar cliente, cédula, teléfono o correo..."
               style={{ paddingLeft: '2.5rem' }} value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -152,14 +225,7 @@ export default function AdminClientes() {
               <option value="Activo">Activo (Instalado)</option>
               <option value="Cancelado">Cancelado</option>
               <option value="Rechazado">Rechazado</option>
-            </select>
-          </div>
-          <div style={{ flex: 1, minWidth: '180px' }}>
-            <select className="form-select" value={sectorFilter} onChange={(e) => setSectorFilter(e.target.value)}>
-              <option value="">Todos los sectores</option>
-              {uniqueSectors.map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
+              <option value="Eliminado">Eliminado (Borrado Lógico)</option>
             </select>
           </div>
           <div style={{ flex: 1, minWidth: '160px' }}>
@@ -177,69 +243,198 @@ export default function AdminClientes() {
           <table className="table">
             <thead>
               <tr>
-                <th>Fecha / Supervisor</th>
+                <th>Fecha / Asesor</th>
                 <th>Datos del Cliente</th>
-                <th>Plan y Estado</th>
-                <th>Ruta Asociada</th>
-                <th>Contacto</th>
+                <th>Contacto y Ubicación</th>
+                <th>Plan y Valor (sin IVA)</th>
+                <th>Datos Bancarios</th>
+                <th>Datos Técnicos</th>
+                <th>Estado</th>
+                <th>Acción</th>
               </tr>
             </thead>
             <tbody>
-              {filteredClients.map(c => (
-                <tr key={c.id}>
-                  <td>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {new Date(c.created_at).toLocaleDateString()}
-                    </div>
-                    <div style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '0.25rem' }}>
-                      {c.profiles?.full_name || 'N/A'}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="client-name">{c.first_name} {c.last_name}</div>
-                    <div className="client-doc">DNI: {c.document_id}</div>
-                  </td>
-                  <td>
-                    <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>{c.plan_name}</div>
-                    <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
-                  </td>
-                  <td>
-                    {c.route ? (
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 500 }}>
-                          <MapPin size={13} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                          {c.route.sector_name}
-                        </div>
-                        <div className="client-doc">
-                          {[c.route.municipio, c.route.barrio].filter(Boolean).join(', ')}
-                        </div>
-                        <div className="client-doc">
-                          {new Date(c.route.fecha + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
-                          {' · Calif: '}
-                          <strong style={{ color: c.route.sector_rating >= 7 ? 'var(--status-success-text)' : c.route.sector_rating >= 5 ? '#3b82f6' : '#f59e0b' }}>
-                            {c.route.sector_rating}/10
-                          </strong>
-                        </div>
+              {filteredClients.map(c => {
+                const isEliminado = c.status === 'Eliminado';
+
+                return (
+                  <tr key={c.id} style={{ opacity: isEliminado ? 0.7 : 1, backgroundColor: isEliminado ? 'rgba(239, 68, 68, 0.03)' : 'transparent' }}>
+                    <td>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {new Date(c.created_at).toLocaleDateString()}
                       </div>
-                    ) : (
-                      <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem', fontStyle: 'italic' }}>Sin ruta</span>
-                    )}
-                  </td>
-                  <td>
-                    <div style={{ fontSize: '0.875rem' }}>{c.phone}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.25rem', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.address}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      <div style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '0.25rem' }}>
+                        {c.profiles?.full_name || 'N/A'}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="client-name">{c.first_name} {c.last_name}</div>
+                      <div className="client-doc">Cédula: <strong>{c.document_id}</strong></div>
+                      {c.email && <div className="client-doc">{c.email}</div>}
+                    </td>
+                    <td>
+                      <div style={{ fontSize: '0.85rem' }}><strong>Tel:</strong> {c.phone}</div>
+                      {c.reference_phone && <div className="client-doc">Ref: {c.reference_phone}</div>}
+                      <div className="client-doc" style={{ marginTop: '0.2rem' }}>
+                        <MapPin size={11} style={{ display: 'inline', marginRight: 3 }} />
+                        {c.address}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{c.plan_name || `${c.plan_family || ''} ${c.bandwidth || ''}`}</div>
+                      {c.plan_price_no_iva !== null && c.plan_price_no_iva !== undefined && (
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          Sin IVA: <strong>${Number(c.plan_price_no_iva).toLocaleString('es-CO')}</strong>
+                        </div>
+                      )}
+                      {c.promotion && c.promotion !== 'Ninguna' && (
+                        <div className="client-doc" style={{ color: '#0369a1' }}>Promo: {c.promotion}</div>
+                      )}
+                    </td>
+                    <td>
+                      {c.bank_name ? (
+                        <div style={{ fontSize: '0.8rem' }}>
+                          <CreditCard size={12} style={{ display: 'inline', marginRight: 4 }} />
+                          <strong>{c.bank_name}</strong>
+                          <div className="client-doc">{c.bank_account_type}: {c.bank_account_number}</div>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin datos bancarios</span>
+                      )}
+                    </td>
+                    <td>
+                      {c.ca && c.ba && c.npc ? (
+                        <div style={{
+                          padding: '0.3rem 0.5rem',
+                          backgroundColor: 'rgba(79, 70, 229, 0.08)',
+                          border: '1px solid rgba(79, 70, 229, 0.2)',
+                          borderRadius: 'var(--radius-md)',
+                          fontSize: '0.75rem',
+                          color: 'var(--primary)',
+                          fontWeight: 600
+                        }}>
+                          <Cpu size={12} style={{ display: 'inline', marginRight: 4 }} />
+                          CA: {c.ca} | BA: {c.ba} | NPC: {c.npc}
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Sin CA/BA/NPC</span>
+                      )}
+                    </td>
+                    <td>
+                      <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
+                      {isEliminado && c.deletion_reason && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--status-danger-text)', marginTop: '0.2rem' }}>
+                          Motivo: {c.deletion_reason}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }}>
+                        Estado
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredClients.length === 0 && !loading && (
-                <tr><td colSpan="5" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No se encontraron resultados.</td></tr>
+                <tr><td colSpan="8" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>No se encontraron resultados.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Modal Actualizar Estado */}
+      {editingClient && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <h3 style={{ margin: 0 }}>Actualizar Estado</h3>
+              <button onClick={() => setEditingClient(null)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
+                Cliente: <strong style={{ color: 'var(--primary)' }}>{editingClient.first_name} {editingClient.last_name}</strong>
+              </p>
+              <form onSubmit={handleStatusChange}>
+                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                  <label className="form-label">Nuevo Estado</label>
+                  <select className="form-select" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
+                    <option value="Registrado">Registrado</option>
+                    <option value="Contactado">Contactado</option>
+                    <option value="Programado">Instalación Programada</option>
+                    <option value="Activo">Activo (Instalado)</option>
+                    <option value="Cancelado">Cancelado</option>
+                    <option value="Rechazado">Rechazado</option>
+                    <option value="Eliminado">❌ Eliminar (Borrado Lógico)</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditingClient(null)}>Cancelar</button>
+                  <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmación Borrado Lógico */}
+      {showDeleteConfirmModal && clientToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--status-danger-text)' }}>
+                <AlertTriangle size={22} />
+                <h3 style={{ margin: 0, color: 'var(--status-danger-text)' }}>¿Está seguro de eliminar?</h3>
+              </div>
+              <button onClick={() => setShowDeleteConfirmModal(false)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
+                El cliente <strong>{clientToDelete.first_name} {clientToDelete.last_name}</strong> será marcado con borrado lógico (<strong>Eliminado</strong>).
+              </p>
+              
+              <div style={{
+                padding: '0.875rem',
+                backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: '1.25rem',
+                fontSize: '0.85rem'
+              }}>
+                <label className="form-label" style={{ color: 'var(--status-danger-text)', fontWeight: 600 }}>
+                  Motivo de Eliminación:
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={deletionReason}
+                  onChange={(e) => setDeletionReason(e.target.value)}
+                  placeholder="Motivo de eliminación..."
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowDeleteConfirmModal(false)}>Cancelar</button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ backgroundColor: 'var(--status-danger-text)', color: 'white' }}
+                  onClick={confirmSoftDeleteClient}
+                >
+                  <Trash2 size={16} /> Confirmar Eliminación
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
