@@ -447,7 +447,7 @@ export default function SupervisorClientes() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginBottom: '1.25rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Número de Cédula *</label>
-                    <input type="text" name="document_id" className="form-input" required pattern="^[0-9A-Za-z\-]+$" title="Solo letras, números y guiones" placeholder="Ej: 1098765432" value={formData.document_id} onChange={handleChange} />
+                    <input type="text" name="document_id" className="form-input" required pattern="^[0-9]+$" title="Solo números" placeholder="Ej: 1098765432" value={formData.document_id} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Correo Electrónico *</label>
@@ -463,11 +463,11 @@ export default function SupervisorClientes() {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Número Telefónico del Cliente *</label>
-                    <input type="text" name="phone" className="form-input" required pattern="^[0-9+\-\s()]+$" title="Solo números y símbolos telefónicos" placeholder="Teléfono principal" value={formData.phone} onChange={handleChange} />
+                    <input type="text" name="phone" className="form-input" required pattern="^[0-9]+$" title="Solo números" placeholder="Teléfono principal" value={formData.phone} onChange={handleChange} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Número Telefónico de Referencia *</label>
-                    <input type="text" name="reference_phone" className="form-input" required pattern="^[0-9+\-\s()]*$" title="Solo números y símbolos telefónicos" placeholder="Teléfono de familiar/referencia" value={formData.reference_phone} onChange={handleChange} />
+                    <input type="text" name="reference_phone" className="form-input" required pattern="^[0-9]+$" title="Solo números" placeholder="Teléfono de familiar/referencia" value={formData.reference_phone} onChange={handleChange} />
                   </div>
                 </div>
 
