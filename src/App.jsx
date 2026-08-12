@@ -77,31 +77,15 @@ function App() {
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchProfile(session.user.id);
-      } else {
-        setUserProfile(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const clearAuthState = () => {
+    setSession(null);
+    setUserProfile(null);
+    setLoading(false);
+  };
 
   const fetchProfile = async (userId) => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -109,16 +93,53 @@ function App() {
         .single();
 
       if (error) {
+        if (error.code === 'PGRST116') {
+          throw new Error('El usuario autenticado no tiene perfil en profiles.');
+        }
         throw error;
       }
 
       setUserProfile(data);
+      setLoading(false);
     } catch (error) {
       console.error('Error fetching profile:', error.message);
-    } finally {
+      setUserProfile(null);
+      setSession(null);
       setLoading(false);
+
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.warn('No se pudo cerrar la sesión:', signOutError?.message);
+      }
     }
   };
+
+  useEffect(() => {
+    const bootstrapSession = async () => {
+      const { data: { session: activeSession } } = await supabase.auth.getSession();
+      setSession(activeSession);
+
+      if (activeSession) {
+        await fetchProfile(activeSession.user.id);
+      } else {
+        clearAuthState();
+      }
+    };
+
+    bootstrapSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      if (nextSession) {
+        fetchProfile(nextSession.user.id);
+      } else {
+        clearAuthState();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (loading) return <LoadingScreen />;
 
