@@ -9,7 +9,7 @@ export default function SupervisorDashboard() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const user = await getCurrentAuthUser();
+        const user = await getCurrentAuthUser({ allowDemo: false });
         if (!user?.id) {
           setStats({ totalClients: 0, pendientes: 0, activos: 0, totalRoutes: 0 });
           return;

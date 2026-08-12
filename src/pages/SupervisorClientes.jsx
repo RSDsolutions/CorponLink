@@ -51,7 +51,7 @@ export default function SupervisorClientes() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const user = await getCurrentAuthUser();
+      const user = await getCurrentAuthUser({ allowDemo: false });
       if (!user?.id) {
         setCurrentUser(null);
         setClients([]);
@@ -89,7 +89,7 @@ export default function SupervisorClientes() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const user = await getCurrentAuthUser();
+      const user = await getCurrentAuthUser({ allowDemo: false });
       if (!user?.id) {
         alert('No hay una sesión activa para guardar clientes.');
         return;

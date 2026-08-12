@@ -15,7 +15,7 @@ export default function SupervisorAsesores() {
   const fetchAdvisors = async () => {
     setLoading(true);
     try {
-      const user = await getCurrentAuthUser();
+      const user = await getCurrentAuthUser({ allowDemo: false });
       if (!user?.id) {
         setAdvisors([]);
         return;
@@ -73,7 +73,7 @@ export default function SupervisorAsesores() {
       return;
     }
     try {
-      const user = await getCurrentAuthUser();
+      const user = await getCurrentAuthUser({ allowDemo: false });
       if (!user?.id) {
         alert('No hay una sesión activa para guardar asesores.');
         return;

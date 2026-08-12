@@ -97,16 +97,17 @@ export const getCurrentDemoUser = () => {
   };
 };
 
-export const getCurrentAuthUser = async () => {
+export const getCurrentAuthUser = async ({ allowDemo = false } = {}) => {
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error) throw error;
     if (user) return user;
   } catch (error) {
-    console.warn('No active Supabase auth session, using demo session fallback:', error.message);
+    console.warn('No active Supabase auth session:', error.message);
   }
 
-  return getCurrentDemoUser();
+  if (allowDemo) return getCurrentDemoUser();
+  return null;
 };
 
 export const getDemoProfiles = () => {

@@ -47,7 +47,7 @@ export default function SupervisorRutas() {
   const fetchRoutes = async () => {
     setLoading(true);
     try {
-      const user = await getCurrentAuthUser();
+      const user = await getCurrentAuthUser({ allowDemo: false });
       if (!user?.id) {
         setRoutes([]);
         return;
@@ -76,7 +76,7 @@ export default function SupervisorRutas() {
   const handleOpenSubmit = async (e) => {
     e.preventDefault();
     try {
-      const user = await getCurrentAuthUser();
+      const user = await getCurrentAuthUser({ allowDemo: false });
       if (!user?.id) {
         alert('No hay una sesión activa para abrir rutas.');
         return;
