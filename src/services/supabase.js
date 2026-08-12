@@ -85,4 +85,33 @@ export const clearDemoSession = () => {
   localStorage.removeItem(DEMO_SESSION_KEY);
 };
 
+export const getDemoProfiles = () => {
+  return Object.entries(DEMO_USERS).map(([email, user]) => ({
+    id: `demo-${email.replace(/[^a-z0-9]+/g, '-')}`,
+    email,
+    full_name: user.full_name,
+    role: user.role,
+    created_at: '2025-01-01T00:00:00.000Z',
+    supervisor_id: null,
+    supervisor: null,
+  }));
+};
+
+export const mergeProfilesWithDemo = (profiles = []) => {
+  const demoProfiles = getDemoProfiles();
+  const merged = [...(Array.isArray(profiles) ? profiles : [])];
+
+  demoProfiles.forEach((demoProfile) => {
+    const exists = merged.some((profile) => {
+      if (profile?.id && profile.id === demoProfile.id) return true;
+      if (profile?.email && profile.email === demoProfile.email) return true;
+      return false;
+    });
+
+    if (!exists) merged.push(demoProfile);
+  });
+
+  return merged;
+};
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
