@@ -41,6 +41,10 @@ export default function SupervisorClientes() {
   // Modal CA, BA, NPC
   const [techClient, setTechClient] = useState(null);
   const [techData, setTechData] = useState({ ca: '', ba: '', npc: '' });
+  const [isEditingTech, setIsEditingTech] = useState(false);
+  const [techHistory, setTechHistory] = useState([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyClient, setHistoryClient] = useState(null);
 
   // Modal Confirmar Eliminar CA, BA, NPC
   const [techClientToDelete, setTechClientToDelete] = useState(null);
@@ -171,35 +175,129 @@ export default function SupervisorClientes() {
       return;
     }
     try {
+      const user = await getCurrentAuthUser({ allowDemo: false });
+      const changedBy = user?.id || null;
+
+      // Save history record (old -> new)
+      const old_ca = techClient?.ca || null;
+      const old_ba = techClient?.ba || null;
+      const old_npc = techClient?.npc || null;
+
+      const new_ca = techData.ca.trim();
+      const new_ba = techData.ba.trim();
+      const new_npc = techData.npc.trim();
+
+      // Insert history (best-effort, don't block main update if history insert fails)
+      const { error: histError } = await supabase.from('tech_data_history').insert([{
+        client_id: techClient.id,
+        changed_by: changedBy,
+        old_ca,
+        old_ba,
+        old_npc,
+        new_ca,
+        new_ba,
+        new_npc,
+        reason: isEditingTech ? 'Edición de datos técnicos' : 'Creación de datos técnicos'
+      }]);
+      if (histError) console.warn('No se pudo insertar el historial técnico:', histError.message);
+
       const { error } = await supabase
         .from('clients')
         .update({
-          ca: techData.ca.trim(),
-          ba: techData.ba.trim(),
-          npc: techData.npc.trim()
+          ca: new_ca,
+          ba: new_ba,
+          npc: new_npc
         })
         .eq('id', techClient.id);
 
       if (error) throw error;
       setTechClient(null);
       setTechData({ ca: '', ba: '', npc: '' });
+      setIsEditingTech(false);
+      setTechHistory([]);
       fetchData();
     } catch (error) {
       alert('Error guardando datos técnicos: ' + error.message);
     }
   };
 
+  // Abrir modal para editar datos técnicos
+  const openEditTech = (client) => {
+    setIsEditingTech(true);
+    setTechClient(client);
+    setTechData({ ca: client.ca || '', ba: client.ba || '', npc: client.npc || '' });
+  };
+
+  // Fetch history for a client
+  const fetchTechHistory = async (clientId) => {
+    try {
+      const { data, error } = await supabase
+        .from('tech_data_history')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      // Resolve changed_by -> profile.full_name when available
+      if (!data || data.length === 0) {
+        setTechHistory([]);
+        return;
+      }
+
+      const userIds = [...new Set(data.map(d => d.changed_by).filter(Boolean))];
+      let profiles = [];
+      if (userIds.length > 0) {
+        const { data: profData, error: profError } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        if (profError) console.warn('Error fetching profiles for tech history:', profError.message);
+        profiles = profData || [];
+      }
+
+      const nameMap = {};
+      profiles.forEach(p => { nameMap[p.id] = p.full_name; });
+
+      const enriched = data.map(h => ({
+        ...h,
+        changed_by_name: h.changed_by ? (nameMap[h.changed_by] || h.changed_by) : 'Sistema'
+      }));
+
+      setTechHistory(enriched);
+    } catch (error) {
+      console.error('Error fetching tech history:', error.message);
+    }
+  };
+
+  const openHistory = (client) => {
+    setHistoryClient(client);
+    setShowHistoryModal(true);
+    fetchTechHistory(client.id);
+  };
+
   // Eliminar datos técnicos (CA, BA, NPC) para permitir su reingreso
   const confirmDeleteTechData = async () => {
     if (!techClientToDelete) return;
     try {
+      const user = await getCurrentAuthUser({ allowDemo: false });
+      const changedBy = user?.id || null;
+
+      // Insert history record recording deletion (old values -> null)
+      const { error: histError } = await supabase.from('tech_data_history').insert([{
+        client_id: techClientToDelete.id,
+        changed_by: changedBy,
+        old_ca: techClientToDelete.ca || null,
+        old_ba: techClientToDelete.ba || null,
+        old_npc: techClientToDelete.npc || null,
+        new_ca: null,
+        new_ba: null,
+        new_npc: null,
+        reason: 'Eliminación de datos técnicos'
+      }]);
+      if (histError) console.warn('No se pudo insertar el historial técnico (eliminación):', histError.message);
+
       const { error } = await supabase
         .from('clients')
-        .update({
-          ca: null,
-          ba: null,
-          npc: null
-        })
+        .update({ ca: null, ba: null, npc: null })
         .eq('id', techClientToDelete.id);
 
       if (error) throw error;
@@ -330,12 +428,28 @@ export default function SupervisorClientes() {
                               🔒 Bloqueado
                             </span>
                           </div>
-                          <div>
+                          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem' }}>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                              onClick={(e) => { e.stopPropagation(); openEditTech(c); }}
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-secondary"
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                              onClick={(e) => { e.stopPropagation(); openHistory(c); }}
+                            >
+                              📜 Historial
+                            </button>
                             <button
                               type="button"
                               className="btn btn-sm"
                               style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', color: 'var(--status-danger-text)', background: 'var(--status-danger-bg)', border: 'none' }}
-                              onClick={() => setTechClientToDelete(c)}
+                              onClick={(e) => { e.stopPropagation(); setTechClientToDelete(c); }}
                             >
                               <Trash2 size={12} /> Eliminar CA, BA, NPC
                             </button>
@@ -764,6 +878,47 @@ export default function SupervisorClientes() {
                 <button type="button" className="btn" style={{ backgroundColor: 'var(--status-danger-text)', color: 'white' }} onClick={confirmDeleteTechData}>
                   <Trash2 size={16} /> Confirmar Eliminación
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Historial de CA/BA/NPC */}
+      {showHistoryModal && historyClient && (
+        <div className="modal-overlay" onClick={() => setShowHistoryModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '640px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ margin: 0 }}>Historial de Datos Técnicos</h3>
+                <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>{historyClient.first_name} {historyClient.last_name}</p>
+              </div>
+              <button onClick={() => setShowHistoryModal(false)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+              {techHistory.length === 0 ? (
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>No hay historial de cambios para este cliente.</div>
+              ) : (
+                <div style={{ display: 'grid', gap: '0.75rem' }}>
+                  {techHistory.map(h => (
+                    <div key={h.id} style={{ padding: '0.75rem', border: '1px solid var(--border)', borderRadius: '6px', background: '#fff' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                        <div style={{ fontWeight: 600 }}>{new Date(h.created_at).toLocaleString()}</div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{h.changed_by || 'Sistema'}</div>
+                      </div>
+                      <div style={{ marginTop: '0.4rem', fontSize: '0.9rem' }}>{h.reason}</div>
+                      <div style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                        <div><strong>Antes:</strong> CA: {h.old_ca || 'N/A'} | BA: {h.old_ba || 'N/A'} | NPC: {h.old_npc || 'N/A'}</div>
+                        <div style={{ marginTop: '0.25rem' }}><strong>Ahora:</strong> CA: {h.new_ca || 'N/A'} | BA: {h.new_ba || 'N/A'} | NPC: {h.new_npc || 'N/A'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowHistoryModal(false)}>Cerrar</button>
               </div>
             </div>
           </div>
