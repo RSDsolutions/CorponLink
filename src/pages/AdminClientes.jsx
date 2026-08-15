@@ -218,7 +218,7 @@ export default function AdminClientes() {
 
       {/* Tabla con filtros */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)', display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+        <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', overflowX: 'auto' }}>
           <div style={{ position: 'relative', flex: 2, minWidth: '240px' }}>
             <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
             <input
@@ -227,7 +227,7 @@ export default function AdminClientes() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-            <div style={{ flex: 1, minWidth: '180px' }}>
+            <div style={{ flex: '1 1 180px', minWidth: '180px', minWidth: 0 }}>
               <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="">Todos los estados</option>
                 <option value="Contactado">Contactado</option>
@@ -239,7 +239,7 @@ export default function AdminClientes() {
               </select>
             </div>
 
-            <div style={{ flex: 1, minWidth: '220px' }}>
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
               <select className="form-select" value={supervisorFilter} onChange={(e) => setSupervisorFilter(e.target.value)}>
                 <option value="">Todos los supervisores</option>
                 {supervisors.map(s => (
@@ -248,10 +248,10 @@ export default function AdminClientes() {
               </select>
             </div>
 
-            <div style={{ flex: 1, minWidth: '260px', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input type="date" className="form-input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+            <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input type="date" className="form-input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ minWidth: 0 }} />
               <span style={{ color: 'var(--text-muted)' }}>—</span>
-              <input type="date" className="form-input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              <input type="date" className="form-input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ minWidth: 0 }} />
               <button className="btn btn-secondary" onClick={() => { setDateFrom(''); setDateTo(''); }}>Limpiar</button>
             </div>
         </div>
