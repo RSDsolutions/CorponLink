@@ -129,13 +129,14 @@ function App() {
 
     bootstrapSession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
-      if (nextSession) {
+      if (event === 'SIGNED_IN' && nextSession) {
         fetchProfile(nextSession.user.id);
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         clearAuthState();
       }
+      // ignore other events (TOKEN_REFRESHED, USER_UPDATED) to avoid repeated profile fetches
     });
 
     return () => subscription.unsubscribe();
