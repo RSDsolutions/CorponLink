@@ -100,6 +100,7 @@ function App() {
       }
 
       setUserProfile(data);
+      console.info('[auth] loaded profile role:', data?.role);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching profile:', error.message);
