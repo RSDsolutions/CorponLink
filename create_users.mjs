@@ -8,7 +8,7 @@ const usersToCreate = [
   { email: 'gerencia.administrativa@corpon-net.com', password: 'CorponAdmin2026!', role: 'admin', full_name: 'Gerencia Administrativa' },
   { email: 'gerencia.comercial@corpon-net.com', password: 'JoseComercial2026!', role: 'supervisor', full_name: 'Supervisor José' },
   { email: 'supervisor1@corpon-net.com', password: 'SamuelSupervisor1!', role: 'supervisor', full_name: 'Supervisor Samuel' },
-  { email: 'supervisor2@corpon-net.com', password: 'HerenSupervisor2!', role: 'supervisor', full_name: 'Supervisor Heren' }
+  { email: 'supervisor2@corpon-net.com', password: 'HerenSupervisor2!', role: 'supervisor', full_name: 'Supervisor Hever' }
 ];
 
 async function run() {
