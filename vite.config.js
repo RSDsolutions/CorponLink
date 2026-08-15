@@ -6,6 +6,10 @@ export default defineConfig({
   plugins: [react()],
   // Disable HMR temporarily to avoid unexpected full-page reloads during debugging
   server: {
-    hmr: false
+    hmr: false,
+    watch: {
+      // Ignore changes in Supabase migrations and .git to avoid dev-server reloads
+      ignored: ['**/supabase/**', '**/.git/**']
+    }
   }
 })
