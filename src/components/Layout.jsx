@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { NavLink } from 'react-router-dom';
 import { 
@@ -13,10 +14,11 @@ import {
 
 export default function Layout({ children, role, userProfile }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = '/login';
+    navigate('/login');
   };
 
   const closeSidebar = () => setSidebarOpen(false);
