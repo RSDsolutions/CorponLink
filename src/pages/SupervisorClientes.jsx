@@ -503,7 +503,9 @@ export default function SupervisorClientes() {
                             <button
                               type="button"
                               className="btn btn-sm btn-secondary"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsEditingTech(false);
                                 setTechClient(c);
                                 setTechData({ ca: '', ba: '', npc: '' });
                               }}
