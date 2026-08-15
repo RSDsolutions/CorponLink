@@ -9,6 +9,10 @@ export default function AdminClientes() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  const [supervisorFilter, setSupervisorFilter] = useState('');
+  const [supervisors, setSupervisors] = useState([]);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   // Modal Estado / Soft Delete
   const [editingClient, setEditingClient] = useState(null);
@@ -30,6 +34,13 @@ export default function AdminClientes() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       setClients(data || []);
+      // fetch supervisors for filter
+      try {
+        const { data: sups } = await supabase.from('profiles').select('id, full_name').eq('role', 'supervisor');
+        setSupervisors(sups || []);
+      } catch (e) {
+        setSupervisors([]);
+      }
     } catch (error) {
       console.error('Error fetching clients:', error.message);
     } finally {
@@ -56,28 +67,27 @@ export default function AdminClientes() {
       matchesStatus = true;
     }
     
+    // Date range filter: if dateFrom/dateTo provided, filter by created_at between
     let matchesDate = true;
-    if (dateFilter !== 'all') {
+    if (dateFrom || dateTo) {
       const clientDate = new Date(c.created_at);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      if (dateFilter === 'today') {
-        const clientDay = new Date(clientDate);
-        clientDay.setHours(0, 0, 0, 0);
-        matchesDate = clientDay.getTime() === today.getTime();
-      } else if (dateFilter === 'week') {
-        const startOfWeek = new Date(today);
-        startOfWeek.setDate(today.getDate() - today.getDay());
-        matchesDate = clientDate >= startOfWeek;
-      } else if (dateFilter === 'month') {
-        matchesDate = clientDate.getMonth() === today.getMonth() && clientDate.getFullYear() === today.getFullYear();
-      } else if (dateFilter === 'year') {
-        matchesDate = clientDate.getFullYear() === today.getFullYear();
+      if (dateFrom) {
+        const from = new Date(dateFrom + 'T00:00:00');
+        if (clientDate < from) matchesDate = false;
+      }
+      if (dateTo) {
+        const to = new Date(dateTo + 'T23:59:59');
+        if (clientDate > to) matchesDate = false;
       }
     }
+
+    // Supervisor filter
+    let matchesSupervisor = true;
+    if (supervisorFilter) {
+      matchesSupervisor = c.supervisor_id === supervisorFilter;
+    }
     
-    return matchesSearch && matchesStatus && matchesDate;
+    return matchesSearch && matchesStatus && matchesDate && matchesSupervisor;
   });
 
   const activeClients = filteredClients.filter(c => c.status !== 'Eliminado');
@@ -218,25 +228,32 @@ export default function AdminClientes() {
             />
           </div>
             <div style={{ flex: 1, minWidth: '180px' }}>
-            <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="">Todos los estados</option>
-              <option value="Contactado">Contactado</option>
-              <option value="Aprobado">Aprobado</option>
-              <option value="Instalado">Instalado</option>
-              <option value="Cancelado">Cancelado</option>
-              <option value="Rechazado">Rechazado</option>
-              <option value="Eliminado">Eliminado (Borrado Lógico)</option>
-            </select>
-          </div>
-          <div style={{ flex: 1, minWidth: '160px' }}>
-            <select className="form-select" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}>
-              <option value="all">Todas las fechas</option>
-              <option value="today">Hoy</option>
-              <option value="week">Esta Semana</option>
-              <option value="month">Este Mes</option>
-              <option value="year">Este Año</option>
-            </select>
-          </div>
+              <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">Todos los estados</option>
+                <option value="Contactado">Contactado</option>
+                <option value="Aprobado">Aprobado</option>
+                <option value="Instalado">Instalado</option>
+                <option value="Cancelado">Cancelado</option>
+                <option value="Rechazado">Rechazado</option>
+                <option value="Eliminado">Eliminado (Borrado Lógico)</option>
+              </select>
+            </div>
+
+            <div style={{ flex: 1, minWidth: '220px' }}>
+              <select className="form-select" value={supervisorFilter} onChange={(e) => setSupervisorFilter(e.target.value)}>
+                <option value="">Todos los supervisores</option>
+                {supervisors.map(s => (
+                  <option key={s.id} value={s.id}>{s.full_name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: 1, minWidth: '260px', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input type="date" className="form-input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+              <span style={{ color: 'var(--text-muted)' }}>—</span>
+              <input type="date" className="form-input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+              <button className="btn btn-secondary" onClick={() => { setDateFrom(''); setDateTo(''); }}>Limpiar</button>
+            </div>
         </div>
 
         <div className="table-responsive">
