@@ -30,6 +30,8 @@ export default function AdminRutas() {
   const [dateFilter, setDateFilter] = useState('all');
   const [supervisors, setSupervisors] = useState([]);
   const [expandedRoutes, setExpandedRoutes] = useState({});
+  const [selectedRoute, setSelectedRoute] = useState(null);
+  const [showRouteModal, setShowRouteModal] = useState(false);
 
   // Soft delete modal for route
   const [routeToDelete, setRouteToDelete] = useState(null);
@@ -134,6 +136,7 @@ export default function AdminRutas() {
   const totalEliminadas = filteredRoutes.filter(r => r.status === 'Eliminado').length;
 
   const toggleExpand = (id) => setExpandedRoutes(prev => ({ ...prev, [id]: !prev[id] }));
+  const openRouteModal = (route) => { setSelectedRoute(route); setShowRouteModal(true); };
 
   const exportToExcel = () => {
     if (filteredRoutes.length === 0) return;
@@ -286,7 +289,7 @@ export default function AdminRutas() {
                     flexWrap: 'wrap'
                   }}
                 >
-                  <div style={{ flex: 1, minWidth: '180px' }} onClick={() => toggleExpand(r.id)}>
+                  <div style={{ flex: 1, minWidth: '180px' }} onClick={() => openRouteModal(r)}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
                       <MapPin size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                       <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{r.sector_name}</span>
@@ -312,6 +315,11 @@ export default function AdminRutas() {
                           </span>
                         </>
                       )}
+                    </div>
+                    <div style={{ marginTop: '0.4rem' }}>
+                      <button type="button" className="btn btn-sm btn-secondary" onClick={(e) => { e.stopPropagation(); openRouteModal(r); }}>
+                        Ver detalle
+                      </button>
                     </div>
                   </div>
 
@@ -375,6 +383,76 @@ export default function AdminRutas() {
           })}
         </div>
       </div>
+
+      {/* Modal Detalle de Ruta */}
+      {showRouteModal && selectedRoute && (
+        <div className="modal-overlay" onClick={() => setShowRouteModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '760px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ margin: 0 }}>{selectedRoute.sector_name}</h3>
+                <p className="text-muted" style={{ margin: 0, fontSize: '0.85rem' }}>{selectedRoute.profiles?.full_name || 'Supervisor desconocido'}</p>
+              </div>
+              <button onClick={() => setShowRouteModal(false)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div>
+                  <strong>Fecha:</strong> {new Date(selectedRoute.fecha + 'T00:00:00').toLocaleDateString()}
+                </div>
+                <div>
+                  <strong>Horario:</strong> {formatTime(selectedRoute.hora_inicio)} {selectedRoute.hora_fin ? `→ ${formatTime(selectedRoute.hora_fin)}` : ''}
+                </div>
+                <div>
+                  <strong>Provincia / Municipio:</strong> {selectedRoute.provincia || selectedRoute.municipio || '-'}
+                </div>
+                <div>
+                  <strong>Barrio:</strong> {selectedRoute.barrio || '-'}
+                </div>
+              </div>
+
+              {selectedRoute.observaciones && (
+                <div style={{ marginBottom: '1rem' }}>
+                  <strong>Observaciones:</strong>
+                  <div style={{ marginTop: '0.5rem', padding: '0.75rem', background: 'var(--status-neutral-bg)' }}>{selectedRoute.observaciones}</div>
+                </div>
+              )}
+
+              <div>
+                <h4 style={{ marginBottom: '0.5rem' }}>Clientes asociados ({selectedRoute.clients?.length || 0})</h4>
+                {selectedRoute.clients && selectedRoute.clients.length > 0 ? (
+                  <table className="table" style={{ marginBottom: 0 }}>
+                    <thead>
+                      <tr>
+                        <th>Nombre</th>
+                        <th>Cédula</th>
+                        <th>Teléfono</th>
+                        <th>Plan</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedRoute.clients.map(c => (
+                        <tr key={c.id}>
+                          <td>{c.first_name} {c.last_name}</td>
+                          <td>{c.document_id}</td>
+                          <td>{c.phone}</td>
+                          <td>{c.plan_name}</td>
+                          <td>{c.status}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div style={{ color: 'var(--text-muted)' }}>No hay clientes asociados a esta ruta.</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Confirmar Borrado Lógico de Ruta */}
       {showDeleteModal && routeToDelete && (
