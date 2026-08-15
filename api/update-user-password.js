@@ -31,8 +31,12 @@ export default async function handler(req, res) {
   const { userId, newPassword } = req.body || {};
   if (!userId || !newPassword) return res.status(400).json({ error: 'Missing userId or newPassword' });
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE) {
-    return res.status(500).json({ error: 'Server misconfigured: missing Supabase keys' });
+  const missing = [];
+  if (!SUPABASE_URL) missing.push('SUPABASE_URL');
+  if (!SUPABASE_SERVICE_ROLE) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+  if (missing.length) {
+    console.error('[update-user-password] missing env:', missing.join(', '));
+    return res.status(500).json({ error: `Server misconfigured: missing ${missing.join(', ')}` });
   }
 
   try {
