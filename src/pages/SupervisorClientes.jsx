@@ -29,7 +29,14 @@ export default function SupervisorClientes() {
     advisor_id: '',
     notes: ''
   };
-  const [formData, setFormData] = useState(emptyForm);
+  const [formData, setFormData] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('supervisor_client_form');
+      return saved ? JSON.parse(saved) : emptyForm;
+    } catch (e) {
+      return emptyForm;
+    }
+  });
 
   // Modal Estado / Borrado Lógico
   const [editingClient, setEditingClient] = useState(null);
@@ -45,6 +52,38 @@ export default function SupervisorClientes() {
   const [techHistory, setTechHistory] = useState([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyClient, setHistoryClient] = useState(null);
+
+  // Persist formData to avoid loss on reload/tab switch
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('supervisor_client_form', JSON.stringify(formData));
+    } catch (e) {
+      // ignore
+    }
+  }, [formData]);
+
+  // Persist techData per client while modal open
+  useEffect(() => {
+    if (!techClient) return;
+    const key = `techData_${techClient.id}`;
+    try {
+      sessionStorage.setItem(key, JSON.stringify(techData));
+    } catch (e) {
+      // ignore
+    }
+  }, [techData, techClient]);
+
+  // Restore techData when opening edit modal
+  useEffect(() => {
+    if (!techClient) return;
+    const key = `techData_${techClient.id}`;
+    try {
+      const saved = sessionStorage.getItem(key);
+      if (saved) setTechData(JSON.parse(saved));
+    } catch (e) {
+      // ignore
+    }
+  }, [techClient]);
 
   // Modal Confirmar Eliminar CA, BA, NPC
   const [techClientToDelete, setTechClientToDelete] = useState(null);
@@ -112,6 +151,7 @@ export default function SupervisorClientes() {
       }]);
 
       if (error) throw error;
+      try { sessionStorage.removeItem('supervisor_client_form'); } catch (e) {}
       setFormData(emptyForm);
       setShowModal(false);
       fetchData();
@@ -211,6 +251,7 @@ export default function SupervisorClientes() {
         .eq('id', techClient.id);
 
       if (error) throw error;
+      try { sessionStorage.removeItem(`techData_${techClient.id}`); } catch (e) {}
       setTechClient(null);
       setTechData({ ca: '', ba: '', npc: '' });
       setIsEditingTech(false);
@@ -301,6 +342,7 @@ export default function SupervisorClientes() {
         .eq('id', techClientToDelete.id);
 
       if (error) throw error;
+      try { sessionStorage.removeItem(`techData_${techClientToDelete.id}`); } catch (e) {}
       setTechClientToDelete(null);
       fetchData();
     } catch (error) {
