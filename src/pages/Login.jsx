@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { LogIn, Signal } from 'lucide-react';
 
@@ -7,6 +8,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -18,7 +20,7 @@ export default function Login() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (error) throw error;
-      window.location.href = '/';
+      navigate('/');
     } catch (error) {
       setError('Credenciales inválidas. Verifica tu correo y contraseña.');
     } finally {
