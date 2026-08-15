@@ -85,8 +85,7 @@ export default function SupervisorClientes() {
     }
   }, [techClient]);
 
-  // Modal Confirmar Eliminar CA, BA, NPC
-  const [techClientToDelete, setTechClientToDelete] = useState(null);
+  // Modal Ver Cliente Completo
 
   // Modal Ver Cliente Completo
   const [viewClient, setViewClient] = useState(null);
@@ -315,40 +314,7 @@ export default function SupervisorClientes() {
     fetchTechHistory(client.id);
   };
 
-  // Eliminar datos técnicos (CA, BA, NPC) para permitir su reingreso
-  const confirmDeleteTechData = async () => {
-    if (!techClientToDelete) return;
-    try {
-      const user = await getCurrentAuthUser({ allowDemo: false });
-      const changedBy = user?.id || null;
-
-      // Insert history record recording deletion (old values -> null)
-      const { error: histError } = await supabase.from('tech_data_history').insert([{
-        client_id: techClientToDelete.id,
-        changed_by: changedBy,
-        old_ca: techClientToDelete.ca || null,
-        old_ba: techClientToDelete.ba || null,
-        old_npc: techClientToDelete.npc || null,
-        new_ca: null,
-        new_ba: null,
-        new_npc: null,
-        reason: 'Eliminación de datos técnicos'
-      }]);
-      if (histError) console.warn('No se pudo insertar el historial técnico (eliminación):', histError.message);
-
-      const { error } = await supabase
-        .from('clients')
-        .update({ ca: null, ba: null, npc: null })
-        .eq('id', techClientToDelete.id);
-
-      if (error) throw error;
-      try { sessionStorage.removeItem(`techData_${techClientToDelete.id}`); } catch (e) {}
-      setTechClientToDelete(null);
-      fetchData();
-    } catch (error) {
-      alert('Error eliminando datos técnicos: ' + error.message);
-    }
-  };
+  // (Eliminación de datos técnicos deshabilitada: solo edición e historial)
 
   const activeClients = clients.filter(c => c.status !== 'Eliminado');
   const totalActivos = activeClients.filter(c => c.status === 'Activo').length;
@@ -487,14 +453,7 @@ export default function SupervisorClientes() {
                             >
                               📜 Historial
                             </button>
-                            <button
-                              type="button"
-                              className="btn btn-sm"
-                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem', color: 'var(--status-danger-text)', background: 'var(--status-danger-bg)', border: 'none' }}
-                              onClick={(e) => { e.stopPropagation(); setTechClientToDelete(c); }}
-                            >
-                              <Trash2 size={12} /> Eliminar CA, BA, NPC
-                            </button>
+                            {/* Eliminación deshabilitada: solo edición y historial */}
                           </div>
                         </div>
                       ) : (
@@ -901,32 +860,7 @@ export default function SupervisorClientes() {
         </div>
       )}
 
-      {/* Modal Confirmación Eliminar CA, BA, NPC */}
-      {techClientToDelete && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '420px' }}>
-            <div className="modal-header">
-              <h3 style={{ margin: 0, color: 'var(--status-danger-text)' }}>¿Eliminar datos técnicos?</h3>
-              <button onClick={() => setTechClientToDelete(null)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-                ¿Está seguro de eliminar los datos técnicos (CA, BA, NPC) asignados a <strong>{techClientToDelete.first_name} {techClientToDelete.last_name}</strong>?
-                <br /><br />
-                Al eliminarlos, los campos se desbloquearán y se podrán registrar nuevamente.
-              </p>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                <button type="button" className="btn btn-secondary" onClick={() => setTechClientToDelete(null)}>Cancelar</button>
-                <button type="button" className="btn" style={{ backgroundColor: 'var(--status-danger-text)', color: 'white' }} onClick={confirmDeleteTechData}>
-                  <Trash2 size={16} /> Confirmar Eliminación
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Eliminación de datos técnicos deshabilitada; solo edición e historial están disponibles */}
 
       {/* Modal Historial de CA/BA/NPC */}
       {showHistoryModal && historyClient && (
