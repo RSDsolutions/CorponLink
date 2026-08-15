@@ -20,15 +20,29 @@ export default function AdminUsers() {
       const list = data || [];
       setProfiles(list);
 
-      // Build map: supervisor_id -> [advisorProfiles]
-      const map = {};
-      list.forEach(p => {
-        if (p.supervisor_id) {
-          map[p.supervisor_id] = map[p.supervisor_id] || [];
-          map[p.supervisor_id].push(p);
-        }
-      });
-      setAdvisorsMap(map);
+      // Also fetch advisors table (separate) and build map supervisor_id -> [advisors]
+      try {
+        const { data: advisorsData, error: advErr } = await supabase.from('advisors').select('*');
+        if (advErr) throw advErr;
+        const map = {};
+        (advisorsData || []).forEach(a => {
+          if (a.supervisor_id) {
+            map[a.supervisor_id] = map[a.supervisor_id] || [];
+            map[a.supervisor_id].push(a);
+          }
+        });
+        // Also include any profiles that reference supervisor_id (for cases where advisors are stored in profiles)
+        list.forEach(p => {
+          if (p.supervisor_id) {
+            map[p.supervisor_id] = map[p.supervisor_id] || [];
+            map[p.supervisor_id].push(p);
+          }
+        });
+        setAdvisorsMap(map);
+      } catch (innerErr) {
+        console.error('Error fetching advisors table:', innerErr.message || innerErr);
+        setAdvisorsMap({});
+      }
     } catch (error) {
       console.error('Error fetching profiles:', error.message);
       setProfiles([]);

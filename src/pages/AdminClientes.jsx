@@ -82,8 +82,8 @@ export default function AdminClientes() {
 
   const activeClients = filteredClients.filter(c => c.status !== 'Eliminado');
   const total = activeClients.length;
-  const activos = activeClients.filter(c => c.status === 'Activo').length;
-  const pendientes = activeClients.filter(c => ['Registrado', 'Contactado', 'Programado'].includes(c.status)).length;
+  const activos = activeClients.filter(c => c.status === 'Instalado').length;
+  const pendientes = activeClients.filter(c => ['Contactado', 'Aprobado'].includes(c.status)).length;
   const eliminados = filteredClients.filter(c => c.status === 'Eliminado').length;
 
   const handleStatusChange = async (e) => {
@@ -217,13 +217,12 @@ export default function AdminClientes() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div style={{ flex: 1, minWidth: '180px' }}>
+            <div style={{ flex: 1, minWidth: '180px' }}>
             <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">Todos los estados</option>
-              <option value="Registrado">Registrado</option>
               <option value="Contactado">Contactado</option>
-              <option value="Programado">Instalación Programada</option>
-              <option value="Activo">Activo (Instalado)</option>
+              <option value="Aprobado">Aprobado</option>
+              <option value="Instalado">Instalado</option>
               <option value="Cancelado">Cancelado</option>
               <option value="Rechazado">Rechazado</option>
               <option value="Eliminado">Eliminado (Borrado Lógico)</option>
@@ -367,13 +366,11 @@ export default function AdminClientes() {
                 <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                   <label className="form-label">Nuevo Estado</label>
                   <select className="form-select" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-                    <option value="Registrado">Registrado</option>
                     <option value="Contactado">Contactado</option>
-                    <option value="Programado">Instalación Programada</option>
-                    <option value="Activo">Activo (Instalado)</option>
+                    <option value="Aprobado">Aprobado</option>
+                    <option value="Instalado">Instalado</option>
                     <option value="Cancelado">Cancelado</option>
                     <option value="Rechazado">Rechazado</option>
-                    <option value="Eliminado">❌ Eliminar (Borrado Lógico)</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>

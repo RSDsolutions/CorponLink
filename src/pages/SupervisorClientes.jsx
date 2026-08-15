@@ -143,7 +143,7 @@ export default function SupervisorClientes() {
         ...formData,
         plan_name: planNameFull,
         plan_price_no_iva: formData.plan_price_no_iva ? parseFloat(formData.plan_price_no_iva) : 0,
-        status: 'Registrado',
+        status: 'Contactado',
         asesor_id: user.id, // Legacy compatibility
         supervisor_id: user.id,
         advisor_id: formData.advisor_id || null
@@ -317,8 +317,9 @@ export default function SupervisorClientes() {
   // (Eliminación de datos técnicos deshabilitada: solo edición e historial)
 
   const activeClients = clients.filter(c => c.status !== 'Eliminado');
-  const totalActivos = activeClients.filter(c => c.status === 'Activo').length;
-  const totalPendientes = activeClients.filter(c => ['Registrado', 'Contactado', 'Programado'].includes(c.status)).length;
+  const total = activeClients.length;
+  const totalActivos = activeClients.filter(c => c.status === 'Instalado').length;
+  const totalPendientes = activeClients.filter(c => ['Contactado', 'Aprobado'].includes(c.status)).length;
   const totalEliminados = clients.filter(c => c.status === 'Eliminado').length;
 
   return (
@@ -720,13 +721,11 @@ export default function SupervisorClientes() {
                 <div className="form-group" style={{ marginBottom: '1.5rem' }}>
                   <label className="form-label">Nuevo Estado</label>
                   <select className="form-select" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-                    <option value="Registrado">Registrado</option>
                     <option value="Contactado">Contactado</option>
-                    <option value="Programado">Instalación Programada</option>
-                    <option value="Activo">Activo (Instalado)</option>
+                    <option value="Aprobado">Aprobado</option>
+                    <option value="Instalado">Instalado</option>
                     <option value="Cancelado">Cancelado</option>
                     <option value="Rechazado">Rechazado</option>
-                    <option value="Eliminado">❌ Eliminar (Borrado Lógico)</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
