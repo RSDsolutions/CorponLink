@@ -3,6 +3,7 @@ import { supabase } from '../services/supabase';
 
 export default function AdminUsers() {
   const [profiles, setProfiles] = useState([]);
+  const [advisorsMap, setAdvisorsMap] = useState({});
   const [loading, setLoading] = useState(true);
   
   const fetchProfiles = async () => {
@@ -16,7 +17,18 @@ export default function AdminUsers() {
         .order('role', { ascending: false });
 
       if (error) throw error;
-      setProfiles(data || []);
+      const list = data || [];
+      setProfiles(list);
+
+      // Build map: supervisor_id -> [advisorProfiles]
+      const map = {};
+      list.forEach(p => {
+        if (p.supervisor_id) {
+          map[p.supervisor_id] = map[p.supervisor_id] || [];
+          map[p.supervisor_id].push(p);
+        }
+      });
+      setAdvisorsMap(map);
     } catch (error) {
       console.error('Error fetching profiles:', error.message);
       setProfiles([]);
@@ -78,6 +90,7 @@ export default function AdminUsers() {
                 <th>Teléfono</th>
                 <th>Dirección</th>
                 <th>Reporta a (Supervisor)</th>
+                <th>Asesores</th>
                 <th>Fecha de Creación</th>
                 <th>Acciones</th>
               </tr>
@@ -95,6 +108,17 @@ export default function AdminUsers() {
                   <td>{p.phone || '-'}</td>
                   <td>{p.address || '-'}</td>
                   <td>{p.supervisor?.full_name || '-'}</td>
+                  <td style={{ maxWidth: 240 }}>
+                    {p.role === 'supervisor' ? (
+                      advisorsMap[p.id] && advisorsMap[p.id].length > 0 ? (
+                        <div style={{ fontSize: '0.875rem' }}>
+                          {advisorsMap[p.id].map(a => a.full_name || a.email).slice(0,5).join(', ')}{advisorsMap[p.id].length > 5 ? ` (+${advisorsMap[p.id].length - 5})` : ''}
+                        </div>
+                      ) : (
+                        <span className="text-muted">0</span>
+                      )
+                    ) : '-'}
+                  </td>
                   <td>{new Date(p.created_at).toLocaleDateString()}</td>
                   <td>
                     <button className="btn" onClick={() => openPasswordModal(p)}>Cambiar contraseña</button>
