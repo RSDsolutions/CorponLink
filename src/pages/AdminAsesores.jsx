@@ -1,6 +1,46 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import { Users, Plus, X, Save, Trash2, Edit2 } from 'lucide-react';
+import { Plus, X, Save, Trash2, Edit2 } from 'lucide-react';
+
+const CITY_OPTIONS = [
+  { name: 'Quito', prefix: 'UIO' },
+  { name: 'Guayaquil', prefix: 'GYE' },
+  { name: 'Cuenca', prefix: 'CUE' },
+  { name: 'Manta', prefix: 'MTA' },
+  { name: 'Machala', prefix: 'MCH' },
+  { name: 'Loja', prefix: 'LOJ' },
+  { name: 'Ambato', prefix: 'AMB' },
+  { name: 'Santo Domingo', prefix: 'SDO' },
+  { name: 'Duran', prefix: 'DUR' },
+  { name: 'Milagro', prefix: 'MIL' },
+  { name: 'Portoviejo', prefix: 'PVO' },
+  { name: 'Esmeraldas', prefix: 'ESM' },
+  { name: 'Ibarra', prefix: 'IBA' },
+  { name: 'Riobamba', prefix: 'RIO' }
+];
+
+const normalizeCity = (city) => (city || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .toUpperCase();
+
+const CITY_PREFIX_BY_NAME = Object.fromEntries(
+  CITY_OPTIONS.map(({ name, prefix }) => [normalizeCity(name), prefix])
+);
+
+const getCityPrefix = (city) => {
+  const normalized = normalizeCity(city);
+  if (!normalized) return '';
+
+  const mappedPrefix = CITY_PREFIX_BY_NAME[normalized];
+  if (mappedPrefix) return mappedPrefix;
+
+  return normalized.replace(/[^A-Z0-9]/g, '').slice(0, 3).padEnd(3, 'X');
+};
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export default function AdminAsesores() {
   const [advisors, setAdvisors] = useState([]);
@@ -8,6 +48,7 @@ export default function AdminAsesores() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [editingBase, setEditingBase] = useState({ city: '', code: '' });
   const [formData, setFormData] = useState({
     id: null,
     code: '',
@@ -62,13 +103,64 @@ export default function AdminAsesores() {
     fetchAdvisors();
   }, []);
 
+  const getNextAdvisorCode = (city, excludedAdvisorId = null, sourceAdvisors = advisors) => {
+    const prefix = getCityPrefix(city);
+    if (!prefix) return '';
+
+    const codePattern = new RegExp(`^${escapeRegExp(prefix)}-(\\d+)$`, 'i');
+    const highestNumber = sourceAdvisors.reduce((highest, advisor) => {
+      if (excludedAdvisorId && advisor.id === excludedAdvisorId) return highest;
+
+      const match = String(advisor.code || '').trim().match(codePattern);
+      if (!match) return highest;
+
+      const codeNumber = Number(match[1]);
+      return Number.isNaN(codeNumber) ? highest : Math.max(highest, codeNumber);
+    }, 0);
+
+    return `${prefix}-${String(highestNumber + 1).padStart(3, '0')}`;
+  };
+
+  const getGeneratedAdvisorCode = (city, excludedAdvisorId = null, sourceAdvisors = advisors) => {
+    const cleanCity = (city || '').trim();
+    if (!cleanCity) return '';
+
+    const isSameEditingCity =
+      isEditing &&
+      excludedAdvisorId &&
+      normalizeCity(cleanCity) === normalizeCity(editingBase.city);
+
+    if (isSameEditingCity && editingBase.code) {
+      return editingBase.code;
+    }
+
+    return getNextAdvisorCode(cleanCity, excludedAdvisorId, sourceAdvisors);
+  };
+
+  const fetchLatestAdvisorCodes = async () => {
+    const { data, error } = await supabase
+      .from('advisors')
+      .select('id, code');
+
+    if (error) throw error;
+    return data || [];
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      code: name === 'city' ? getGeneratedAdvisorCode(value, prev.id) : prev.code
+    }));
   };
 
   const handleEdit = (advisor) => {
     const supervisor = advisor.supervisor_advisors?.[0];
+    setEditingBase({
+      city: advisor.city || '',
+      code: advisor.code || ''
+    });
     setFormData({
       id: advisor.id,
       code: advisor.code || '',
@@ -89,6 +181,7 @@ export default function AdminAsesores() {
   };
 
   const handleOpenNew = () => {
+    setEditingBase({ city: '', code: '' });
     setFormData({
       id: null,
       code: '',
@@ -112,8 +205,12 @@ export default function AdminAsesores() {
     e.preventDefault();
 
     try {
-      if (!formData.code || !formData.first_name || !formData.first_surname) {
-        alert('Los campos Código, Primer Nombre y Primer Apellido son obligatorios.');
+      const advisorCity = formData.city.trim();
+      const latestAdvisorCodes = await fetchLatestAdvisorCodes();
+      const advisorCode = getGeneratedAdvisorCode(advisorCity, formData.id, latestAdvisorCodes);
+
+      if (!advisorCity || !advisorCode || !formData.first_name || !formData.first_surname) {
+        alert('Los campos Ciudad, Primer Nombre y Primer Apellido son obligatorios.');
         return;
       }
 
@@ -122,13 +219,13 @@ export default function AdminAsesores() {
         const { error } = await supabase
           .from('advisors')
           .update({
-            code: formData.code,
+            code: advisorCode,
             first_name: formData.first_name,
             second_name: formData.second_name,
             first_surname: formData.first_surname,
             second_surname: formData.second_surname,
             document_id: formData.document_id,
-            city: formData.city,
+            city: advisorCity,
             address: formData.address,
             email: formData.email,
             phone: formData.phone,
@@ -169,13 +266,13 @@ export default function AdminAsesores() {
         const { data: newAdvisor, error: insertError } = await supabase
           .from('advisors')
           .insert({
-            code: formData.code,
+            code: advisorCode,
             first_name: formData.first_name,
             second_name: formData.second_name,
             first_surname: formData.first_surname,
             second_surname: formData.second_surname,
             document_id: formData.document_id,
-            city: formData.city,
+            city: advisorCity,
             address: formData.address,
             email: formData.email,
             phone: formData.phone,
@@ -236,6 +333,13 @@ export default function AdminAsesores() {
     const assignment = advisor.supervisor_advisors?.[0];
     return assignment?.profiles?.full_name || 'Sin asignar';
   };
+
+  const cityOptions = [
+    ...CITY_OPTIONS.map(({ name }) => name),
+    ...advisors.map(advisor => advisor.city).filter(Boolean)
+  ].filter((city, index, options) =>
+    options.findIndex(option => normalizeCity(option) === normalizeCity(city)) === index
+  );
 
   return (
     <div>
@@ -367,27 +471,47 @@ export default function AdminAsesores() {
               <form onSubmit={handleSubmit}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                   <div className="form-group">
+                    <label className="form-label">Ciudad *</label>
+                    <input
+                      type="text"
+                      name="city"
+                      className="form-input"
+                      required
+                      list="advisor-city-options"
+                      value={formData.city}
+                      onChange={handleChange}
+                      placeholder="Ej: Quito"
+                    />
+                    <datalist id="advisor-city-options">
+                      {cityOptions.map(city => (
+                        <option key={city} value={city} />
+                      ))}
+                    </datalist>
+                  </div>
+                  <div className="form-group">
                     <label className="form-label">Código *</label>
                     <input
                       type="text"
                       name="code"
                       className="form-input"
                       required
+                      readOnly
                       value={formData.code}
-                      onChange={handleChange}
-                      placeholder="Ej: UIO-001"
+                      placeholder="Auto"
+                      style={{ backgroundColor: 'var(--surface-hover)', cursor: 'not-allowed' }}
                     />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Cédula</label>
-                    <input
-                      type="text"
-                      name="document_id"
-                      className="form-input"
-                      value={formData.document_id}
-                      onChange={handleChange}
-                    />
-                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: '1rem' }}>
+                  <label className="form-label">Cédula</label>
+                  <input
+                    type="text"
+                    name="document_id"
+                    className="form-input"
+                    value={formData.document_id}
+                    onChange={handleChange}
+                  />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -456,19 +580,6 @@ export default function AdminAsesores() {
                       name="phone"
                       className="form-input"
                       value={formData.phone}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Ciudad</label>
-                    <input
-                      type="text"
-                      name="city"
-                      className="form-input"
-                      value={formData.city}
                       onChange={handleChange}
                     />
                   </div>
