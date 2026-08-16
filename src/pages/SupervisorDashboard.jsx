@@ -235,17 +235,41 @@ export default function SupervisorDashboard() {
           </button>
         </div>
 
-        <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+        <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
           <div className="info-box">
-            <strong>Cédula</strong>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.9rem' }}>📇</span> Cédula
+            </strong>
             <span>{profile?.document_id || 'No definida'}</span>
           </div>
           <div className="info-box">
-            <strong>Teléfono</strong>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.9rem' }}>📧</span> Correo
+            </strong>
+            <span>{profile?.email || 'No definido'}</span>
+          </div>
+          <div className="info-box">
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.9rem' }}>📱</span> Teléfono
+            </strong>
             <span>{profile?.phone || 'No definido'}</span>
           </div>
           <div className="info-box">
-            <strong>Dirección</strong>
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.9rem' }}>🏙️</span> Ciudad
+            </strong>
+            <span>{profile?.city || 'No definida'}</span>
+          </div>
+          <div className="info-box">
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.9rem' }}>🔖</span> Código
+            </strong>
+            <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{profile?.code || 'SUP-XXX-001'}</span>
+          </div>
+          <div className="info-box">
+            <strong style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.9rem' }}>📍</span> Dirección
+            </strong>
             <span>{profile?.address || 'No definida'}</span>
           </div>
         </div>
