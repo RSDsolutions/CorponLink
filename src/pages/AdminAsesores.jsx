@@ -71,20 +71,29 @@ export default function AdminAsesores() {
     try {
       const { data: advisorsData, error: advisorsError } = await supabase
         .from('advisors')
-        .select(`
-          *,
-          supervisor_advisors (
-            id,
-            supervisor_id,
-            profiles:profiles!supervisor_advisors_supervisor_id_fkey (id, full_name)
-          )
-        `)
+        .select('*')
         .order('code', { ascending: true });
 
       if (advisorsError) throw advisorsError;
-      setAdvisors(advisorsData || []);
 
-      // Fetch supervisors for assignment dropdown
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('supervisor_advisors')
+        .select('advisor_id, supervisor_id, profiles:supervisor_id (id, full_name)');
+
+      if (assignmentsError) throw assignmentsError;
+
+      const assignmentsByAdvisor = (assignmentsData || []).reduce((acc, item) => {
+        acc[item.advisor_id] = item;
+        return acc;
+      }, {});
+
+      const normalizedAdvisors = (advisorsData || []).map(advisor => ({
+        ...advisor,
+        supervisor_assignment: assignmentsByAdvisor[advisor.id] || null
+      }));
+
+      setAdvisors(normalizedAdvisors);
+
       const { data: supsData, error: supsError } = await supabase
         .from('profiles')
         .select('id, full_name')
@@ -163,7 +172,7 @@ export default function AdminAsesores() {
   };
 
   const handleEdit = (advisor) => {
-    const supervisor = advisor.supervisor_advisors?.[0];
+    const supervisor = advisor.supervisor_assignment;
     setEditingBase({
       city: advisor.city || '',
       code: advisor.code || ''
@@ -337,8 +346,8 @@ export default function AdminAsesores() {
   };
 
   const getSupervisorName = (advisor) => {
-    const assignment = advisor.supervisor_advisors?.[0];
-    return assignment?.profiles?.full_name || assignment?.supervisor?.full_name || 'Sin asignar';
+    const assignment = advisor.supervisor_assignment;
+    return assignment?.profiles?.full_name || 'Sin asignar';
   };
 
   const cityOptions = [
