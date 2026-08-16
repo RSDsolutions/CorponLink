@@ -46,6 +46,7 @@ export default function SupervisorClientes() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const [advisorsList, setAdvisorsList] = useState([]);
+  const [plans, setPlans] = useState([]);
 
   // Modal Nuevo Cliente
   const [showModal, setShowModal] = useState(false);
@@ -62,8 +63,9 @@ export default function SupervisorClientes() {
     bank_account_number: '',
     bank_account_type: 'Ahorros',
     bank_name: '',
-    plan_family: 'Fibra Óptica',
-    bandwidth: '100 Mbps',
+    plan_family: '',
+    plan: '',
+    bandwidth: '',
     promotion: 'Ninguna',
     plan_price_no_iva: '',
     advisor_id: '',
@@ -184,7 +186,25 @@ export default function SupervisorClientes() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); fetchPlans(); }, []);
+
+  const fetchPlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('*')
+        .order('family', { ascending: true })
+        .order('plan', { ascending: true });
+
+      if (error) throw error;
+      setPlans(data || []);
+    } catch (error) {
+      console.error('Error fetching plans:', error.message);
+    }
+  };
+
+  const familyOptions = [...new Set(plans.map(plan => plan.family).filter(Boolean))];
+  const planOptions = formData.plan_family ? plans.filter(plan => plan.family === formData.plan_family) : [];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -204,6 +224,28 @@ export default function SupervisorClientes() {
       return;
     }
 
+    if (name === 'plan_family') {
+      setFormData(prev => ({
+        ...prev,
+        plan_family: value,
+        plan: '',
+        bandwidth: '',
+        plan_price_no_iva: ''
+      }));
+      return;
+    }
+
+    if (name === 'plan') {
+      const selectedPlan = plans.find(plan => plan.family === formData.plan_family && plan.plan === value);
+      setFormData(prev => ({
+        ...prev,
+        plan: value,
+        bandwidth: selectedPlan ? selectedPlan.speed : '',
+        plan_price_no_iva: selectedPlan ? String(selectedPlan.price) : ''
+      }));
+      return;
+    }
+
     setFormData({ ...formData, [name]: value });
   };
 
@@ -217,8 +259,16 @@ export default function SupervisorClientes() {
         return;
       }
 
-      const planNameFull = `${formData.plan_family} - ${formData.bandwidth}`;
+      const selectedPlan = plans.find(plan => plan.family === formData.plan_family && plan.plan === formData.plan);
+      const resolvedBandwidth = selectedPlan ? selectedPlan.speed : formData.bandwidth;
+      const resolvedPlanPrice = selectedPlan ? Number(selectedPlan.price) : formData.plan_price_no_iva ? parseFloat(formData.plan_price_no_iva) : 0;
+      const planNameFull = formData.plan ? `${formData.plan_family} - ${formData.plan}` : `${formData.plan_family} - ${resolvedBandwidth}`;
       const selectedPaymentMethod = formData.payment_method || PAYMENT_METHODS.BANK_ACCOUNT;
+
+      if (!formData.plan_family || !formData.plan) {
+        alert('Selecciona la familia y el plan del cliente.');
+        return;
+      }
 
       if (
         selectedPaymentMethod === PAYMENT_METHODS.BANK_ACCOUNT &&
@@ -258,9 +308,11 @@ export default function SupervisorClientes() {
       const { error } = await supabase.from('clients').insert([{
         ...clientFormData,
         ...paymentFields,
-        notes: formData.notes?.trim() || '',
+        plan: formData.plan,
         plan_name: planNameFull,
-        plan_price_no_iva: formData.plan_price_no_iva ? parseFloat(formData.plan_price_no_iva) : 0,
+        bandwidth: resolvedBandwidth || '',
+        plan_price_no_iva: resolvedPlanPrice,
+        notes: formData.notes?.trim() || '',
         status: 'Contactado',
         asesor_id: user.id, // Legacy compatibility
         supervisor_id: user.id,
@@ -815,35 +867,36 @@ export default function SupervisorClientes() {
                 <h4 style={{ fontSize: '0.9rem', color: 'var(--primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <FileText size={15} /> 4. Plan a Contratar
                 </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.875rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.875rem', marginBottom: '1rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label">Familia de Plan *</label>
-                    <input list="plan-families" name="plan_family" className="form-input" required placeholder="Ej: Fibra Óptica, Especial..." value={formData.plan_family} onChange={handleChange} />
-                    <datalist id="plan-families">
-                      <option value="Fibra Óptica" />
-                      <option value="Inalámbrico" />
-                      <option value="Empresarial / Pyme" />
-                    </datalist>
+                    <select name="plan_family" className="form-select" required value={formData.plan_family} onChange={handleChange}>
+                      <option value="">Seleccione la familia...</option>
+                      {familyOptions.map(family => (
+                        <option key={family} value={family}>{family}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Ancho de Banda *</label>
-                    <input list="bandwidths" name="bandwidth" className="form-input" required placeholder="Ej: 100 Mbps, 2 Gbps..." value={formData.bandwidth} onChange={handleChange} />
-                    <datalist id="bandwidths">
-                      <option value="50 Mbps" />
-                      <option value="100 Mbps" />
-                      <option value="200 Mbps" />
-                      <option value="300 Mbps" />
-                      <option value="500 Mbps" />
-                      <option value="1 Gbps" />
-                    </datalist>
+                    <label className="form-label">Plan *</label>
+                    <select name="plan" className="form-select" required value={formData.plan} onChange={handleChange} disabled={!formData.plan_family}>
+                      <option value="">Seleccione el plan...</option>
+                      {planOptions.map(plan => (
+                        <option key={`${plan.family}-${plan.plan}`} value={plan.plan}>{plan.plan}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Velocidad</label>
+                    <input type="text" name="bandwidth" className="form-input" readOnly value={formData.bandwidth} placeholder="Se llena automáticamente" />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Valor del Plan sin IVA ($)</label>
+                    <input type="text" name="plan_price_no_iva" className="form-input" readOnly value={formData.plan_price_no_iva} placeholder="Se llena automáticamente" />
+                  </div>
+                  <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: 0 }}>
                     <label className="form-label">Promoción *</label>
                     <input type="text" name="promotion" className="form-input" required placeholder="Ej: Ninguna, 50% DCTO 1er mes" value={formData.promotion} onChange={handleChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Valor del Plan sin IVA ($) *</label>
-                    <input type="number" step="0.01" name="plan_price_no_iva" className="form-input" required placeholder="Ej: 45000" value={formData.plan_price_no_iva} onChange={handleChange} />
                   </div>
                 </div>
 

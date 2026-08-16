@@ -179,6 +179,7 @@ export default function AdminClientes() {
       'Tipo de Cuenta': c.bank_account_type || '',
       'Número de Cuenta': c.bank_account_number || '',
       'Familia Plan': c.plan_family || '',
+      'Plan': c.plan || c.plan_name || '',
       'Ancho de Banda': c.bandwidth || '',
       'Promoción': c.promotion || '',
       'Valor sin IVA ($)': c.plan_price_no_iva || '',
