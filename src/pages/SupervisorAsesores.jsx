@@ -12,33 +12,67 @@ export default function SupervisorAsesores() {
     try {
       const user = await getCurrentAuthUser({ allowDemo: false });
       if (!user?.id) {
+        console.warn('⚠️ No user authenticated');
         setAdvisors([]);
         setSupervisorProfile(null);
         return;
       }
 
+      console.log('📌 Supervisor ID:', user.id);
+
       // Get supervisor profile
-      const { data: profileData } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
+      
+      if (profileError) {
+        console.error('❌ Error fetching profile:', profileError);
+        throw profileError;
+      }
       setSupervisorProfile(profileData);
+      console.log('📌 Supervisor Profile:', profileData?.full_name);
 
-      // Get advisors assigned to this supervisor via junction table
-      const { data, error } = await supabase
+      // Get all supervisor_advisors assignments for this supervisor
+      const { data: assignments, error: assignmentError } = await supabase
         .from('supervisor_advisors')
-        .select('advisor_id, advisors(*)')
-        .eq('supervisor_id', user.id)
-        .order('created_at', { ascending: false });
+        .select('advisor_id')
+        .eq('supervisor_id', user.id);
 
-      if (error) throw error;
+      if (assignmentError) {
+        console.error('❌ Error fetching assignments:', assignmentError);
+        throw assignmentError;
+      }
 
-      // Extract advisor data from junction table
-      const advisorsList = data?.map(item => item.advisors) || [];
-      setAdvisors(advisorsList);
+      console.log('📌 Assignments found:', assignments?.length || 0);
+
+      if (!assignments || assignments.length === 0) {
+        console.warn('⚠️ No advisors assigned to this supervisor');
+        setAdvisors([]);
+        return;
+      }
+
+      // Fetch full advisor details for each assignment
+      const advisorIds = assignments.map(a => a.advisor_id);
+      const { data: advisorsData, error: advisorsError } = await supabase
+        .from('advisors')
+        .select('*')
+        .in('id', advisorIds);
+
+      if (advisorsError) {
+        console.error('❌ Error fetching advisors:', advisorsError);
+        throw advisorsError;
+      }
+
+      // Sort client-side by code
+      const sorted = (advisorsData || []).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+      console.log('📌 Advisors found:', sorted.length);
+      setAdvisors(sorted);
     } catch (error) {
-      console.error('Error fetching advisors:', error.message);
+      console.error('❌ Error fetching advisors:', error.message);
+      console.error('Error details:', error);
+      setAdvisors([]);
     } finally {
       setLoading(false);
     }
