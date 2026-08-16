@@ -253,10 +253,11 @@ export default function SupervisorDashboard() {
 
       {showProfileModal && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '520px' }}>
+          <div className="modal-content" style={{ maxWidth: '600px' }}>
             <div className="modal-header">
               <div>
                 <h3 style={{ margin: 0 }}>Perfil de usuario</h3>
+                <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Completa tu información personal</p>
               </div>
               <button onClick={() => setShowProfileModal(false)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
                 <X size={20} />
@@ -264,55 +265,73 @@ export default function SupervisorDashboard() {
             </div>
             <div className="modal-body">
               <form onSubmit={handleSaveProfile}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Primer Nombre *</label>
-                    <input type="text" name="first_name" className="form-input" required value={profileForm.first_name} onChange={handleProfileChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Segundo Nombre</label>
-                    <input type="text" name="second_name" className="form-input" value={profileForm.second_name} onChange={handleProfileChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Primer Apellido *</label>
-                    <input type="text" name="first_surname" className="form-input" required value={profileForm.first_surname} onChange={handleProfileChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Segundo Apellido</label>
-                    <input type="text" name="second_surname" className="form-input" value={profileForm.second_surname} onChange={handleProfileChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Cédula</label>
-                    <input type="text" name="document_id" className="form-input" value={profileForm.document_id} onChange={handleProfileChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Ciudad *</label>
-                    <select name="city" className="form-select" required value={profileForm.city} onChange={handleProfileChange}>
-                      <option value="">Seleccione la ciudad...</option>
-                      {CITY_OPTIONS.map(city => (
-                        <option key={city.name} value={city.name}>{city.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Código</label>
-                    <input type="text" className="form-input" value={profileForm.code || getSupervisorCode(profileForm.city)} readOnly style={{ backgroundColor: 'var(--surface-hover)', cursor: 'not-allowed' }} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Correo Electrónico</label>
-                    <input type="email" name="email" className="form-input" value={profileForm.email} onChange={handleProfileChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Teléfono</label>
-                    <input type="text" name="phone" className="form-input" value={profileForm.phone} onChange={handleProfileChange} />
-                  </div>
-                  <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: '1.5rem' }}>
-                    <label className="form-label">Dirección</label>
-                    <textarea name="address" className="form-textarea" rows="3" value={profileForm.address} onChange={handleProfileChange}></textarea>
+                {/* Información Personal */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Información Personal</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Primer Nombre *</label>
+                      <input type="text" name="first_name" className="form-input" required value={profileForm.first_name} onChange={handleProfileChange} placeholder="Juan" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Segundo Nombre</label>
+                      <input type="text" name="second_name" className="form-input" value={profileForm.second_name} onChange={handleProfileChange} placeholder="Carlos" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Primer Apellido *</label>
+                      <input type="text" name="first_surname" className="form-input" required value={profileForm.first_surname} onChange={handleProfileChange} placeholder="García" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Segundo Apellido</label>
+                      <input type="text" name="second_surname" className="form-input" value={profileForm.second_surname} onChange={handleProfileChange} placeholder="López" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+                      <label className="form-label">Cédula</label>
+                      <input type="text" name="document_id" className="form-input" value={profileForm.document_id} onChange={handleProfileChange} placeholder="1234567890" />
+                    </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                {/* Ubicación y Código */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Ubicación</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Ciudad *</label>
+                      <select name="city" className="form-select" required value={profileForm.city} onChange={handleProfileChange}>
+                        <option value="">Seleccione la ciudad...</option>
+                        {CITY_OPTIONS.map(city => (
+                          <option key={city.name} value={city.name}>{city.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Código (Auto)</label>
+                      <input type="text" className="form-input" value={profileForm.code || getSupervisorCode(profileForm.city)} readOnly style={{ backgroundColor: 'var(--surface-hover)', cursor: 'not-allowed', fontWeight: 500 }} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0, gridColumn: '1 / -1' }}>
+                      <label className="form-label">Dirección</label>
+                      <textarea name="address" className="form-textarea" rows="2" value={profileForm.address} onChange={handleProfileChange} placeholder="Calle 123, Edificio A, Apt 4"></textarea>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contacto */}
+                <div>
+                  <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', opacity: 0.7 }}>Información de Contacto</h4>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Correo Electrónico</label>
+                      <input type="email" name="email" className="form-input" value={profileForm.email} onChange={handleProfileChange} placeholder="usuario@ejemplo.com" />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Teléfono</label>
+                      <input type="text" name="phone" className="form-input" value={profileForm.phone} onChange={handleProfileChange} placeholder="+593 9 XXXX XXXX" />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
                   <button type="button" className="btn btn-secondary" onClick={() => setShowProfileModal(false)}>Cancelar</button>
                   <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar perfil</button>
                 </div>
