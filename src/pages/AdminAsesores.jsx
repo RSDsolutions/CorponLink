@@ -47,6 +47,7 @@ export default function AdminAsesores() {
   const [supervisors, setSupervisors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [selectedAdvisor, setSelectedAdvisor] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editingBase, setEditingBase] = useState({ city: '', code: '' });
   const [formData, setFormData] = useState({
@@ -350,6 +351,19 @@ export default function AdminAsesores() {
     return assignment?.profiles?.full_name || 'Sin asignar';
   };
 
+  const advisorGroups = [
+    ...supervisors.map(supervisor => ({
+      id: supervisor.id,
+      name: supervisor.full_name,
+      advisors: advisors.filter(advisor => advisor.supervisor_assignment?.supervisor_id === supervisor.id)
+    })),
+    {
+      id: 'unassigned',
+      name: 'Sin supervisor',
+      advisors: advisors.filter(advisor => !advisor.supervisor_assignment)
+    }
+  ].filter(group => group.advisors.length > 0 || group.id === 'unassigned');
+
   const cityOptions = [
     ...CITY_OPTIONS.map(({ name }) => name),
     ...advisors.map(advisor => advisor.city).filter(Boolean)
@@ -362,115 +376,187 @@ export default function AdminAsesores() {
       <div className="page-header">
         <div>
           <h2>Gestión de Asesores</h2>
-          <p className="text-muted">Panel centralizado para crear, editar y asignar asesores a supervisores.</p>
+          <p className="text-muted">Panel centralizado por supervisor para ver, editar y asignar asesores.</p>
         </div>
         <button className="btn btn-primary" onClick={handleOpenNew}>
           <Plus size={18} /> Nuevo Asesor
         </button>
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)' }}>
-          <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Directorio de Asesores</h3>
+      <div className="card" style={{ padding: '1rem', overflow: 'hidden' }}>
+        <div className="card-header" style={{ padding: 0, marginBottom: '1rem', borderBottom: 'none' }}>
+          <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Asesores por supervisor</h3>
         </div>
 
         {loading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
             Cargando asesores...
           </div>
-        ) : advisors.length === 0 ? (
+        ) : advisorGroups.length === 0 ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
             No hay asesores registrados. Crea uno nuevo para comenzar.
           </div>
         ) : (
-          <div className="table-responsive">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Código</th>
-                  <th>Nombre Completo</th>
-                  <th>Cédula</th>
-                  <th>Email</th>
-                  <th>Teléfono</th>
-                  <th>Ciudad</th>
-                  <th>Contrato</th>
-                  <th>Supervisor Asignado</th>
-                  <th>Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {advisors.map(advisor => (
-                  <tr key={advisor.id}>
-                    <td>
-                      <span style={{
-                        padding: '0.25rem 0.5rem',
-                        backgroundColor: 'var(--primary-light)',
-                        color: 'var(--primary)',
-                        borderRadius: '4px',
-                        fontWeight: 600,
-                        fontSize: '0.85rem'
-                      }}>
-                        {advisor.code}
-                      </span>
-                    </td>
-                    <td style={{ fontWeight: 500 }}>
-                      {advisor.first_name} {advisor.second_name} {advisor.first_surname} {advisor.second_surname}
-                    </td>
-                    <td>{advisor.document_id || '—'}</td>
-                    <td style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{advisor.email || '—'}</td>
-                    <td>{advisor.phone || '—'}</td>
-                    <td>{advisor.city || '—'}</td>
-                    <td>
-                      <span style={{
-                        padding: '0.35rem 0.75rem',
-                        backgroundColor: advisor.contract_signed ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                        color: advisor.contract_signed ? '#22c55e' : '#ef4444',
-                        borderRadius: '4px',
-                        fontSize: '0.85rem',
-                        fontWeight: 500
-                      }}>
-                        {advisor.contract_signed ? '✓ Sí' : '✗ No'}
-                      </span>
-                    </td>
-                    <td>
-                      <span style={{
-                        padding: '0.35rem 0.75rem',
-                        backgroundColor: getSupervisorName(advisor) === 'Sin asignar' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-                        color: getSupervisorName(advisor) === 'Sin asignar' ? '#ef4444' : '#22c55e',
-                        borderRadius: '4px',
-                        fontSize: '0.85rem',
-                        fontWeight: 500
-                      }}>
-                        {getSupervisorName(advisor)}
-                      </span>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <div style={{ display: 'grid', gap: '1rem' }}>
+            {advisorGroups.map(group => (
+              <div key={group.id} style={{
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                background: 'var(--surface)',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.75rem 1rem',
+                  background: 'var(--surface-hover)',
+                  borderBottom: '1px solid var(--border)'
+                }}>
+                  <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{group.name}</h4>
+                  <span style={{
+                    minWidth: '2rem',
+                    textAlign: 'center',
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '999px',
+                    background: 'var(--primary-light)',
+                    color: 'var(--primary)',
+                    fontSize: '0.8rem',
+                    fontWeight: 600
+                  }}>
+                    {group.advisors.length}
+                  </span>
+                </div>
+
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))',
+                  gap: '0.75rem',
+                  padding: '0.75rem'
+                }}>
+                  {group.advisors.map(advisor => (
+                    <div
+                      key={advisor.id}
+                      onClick={() => setSelectedAdvisor(advisor)}
+                      style={{
+                        cursor: 'pointer',
+                        border: '1px solid var(--border)',
+                        borderRadius: '10px',
+                        background: 'var(--surface)',
+                        padding: '0.75rem',
+                        transition: 'all 0.2s ease',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.04)'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                        <span style={{
+                          padding: '0.2rem 0.45rem',
+                          borderRadius: '6px',
+                          fontSize: '0.7rem',
+                          background: 'var(--primary-light)',
+                          color: 'var(--primary)',
+                          fontWeight: 700
+                        }}>
+                          {advisor.code}
+                        </span>
+                        <span style={{
+                          padding: '0.2rem 0.45rem',
+                          borderRadius: '6px',
+                          fontSize: '0.7rem',
+                          background: advisor.contract_signed ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: advisor.contract_signed ? '#22c55e' : '#ef4444',
+                          fontWeight: 600
+                        }}>
+                          {advisor.contract_signed ? 'Firmado' : 'Pend.'}
+                        </span>
+                      </div>
+
+                      <div style={{ fontWeight: 700, fontSize: '0.92rem', marginBottom: '0.35rem' }}>
+                        {advisor.first_name} {advisor.second_name} {advisor.first_surname} {advisor.second_surname}
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                        {advisor.document_id || 'Sin cédula'}
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>
+                        {advisor.city || 'Sin ciudad'}
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        {advisor.email || 'Sin email'}
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.7rem' }}>
                         <button
-                          onClick={() => handleEdit(advisor)}
+                          type="button"
                           className="btn btn-icon btn-secondary"
-                          title="Editar"
-                          style={{ border: 'none', padding: '0.5rem' }}
+                          style={{ border: 'none', padding: '0.45rem' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(advisor);
+                          }}
                         >
-                          <Edit2 size={16} />
+                          <Edit2 size={14} />
                         </button>
                         <button
-                          onClick={() => handleDelete(advisor.id)}
+                          type="button"
                           className="btn btn-icon"
-                          title="Eliminar"
-                          style={{ border: 'none', padding: '0.5rem', color: '#ef4444' }}
+                          style={{ border: 'none', padding: '0.45rem', color: '#ef4444' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(advisor.id);
+                          }}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {selectedAdvisor && (
+        <div className="modal-overlay" onClick={() => setSelectedAdvisor(null)}>
+          <div className="modal-content" style={{ maxWidth: '620px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ margin: 0 }}>{selectedAdvisor.first_name} {selectedAdvisor.first_surname}</h3>
+              </div>
+              <button onClick={() => setSelectedAdvisor(null)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="info-box"><strong>Código</strong><span>{selectedAdvisor.code || '—'}</span></div>
+                <div className="info-box"><strong>Supervisor</strong><span>{getSupervisorName(selectedAdvisor)}</span></div>
+                <div className="info-box"><strong>Cédula</strong><span>{selectedAdvisor.document_id || '—'}</span></div>
+                <div className="info-box"><strong>Ciudad</strong><span>{selectedAdvisor.city || '—'}</span></div>
+                <div className="info-box"><strong>Email</strong><span>{selectedAdvisor.email || '—'}</span></div>
+                <div className="info-box"><strong>Teléfono</strong><span>{selectedAdvisor.phone || '—'}</span></div>
+                <div className="info-box" style={{ gridColumn: '1 / -1' }}><strong>Dirección</strong><span>{selectedAdvisor.address || '—'}</span></div>
+                <div className="info-box" style={{ gridColumn: '1 / -1' }}><strong>Contrato</strong><span>{selectedAdvisor.contract_signed ? 'Firmado' : 'Pendiente'}</span></div>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setSelectedAdvisor(null)}>
+                Cerrar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => {
+                setSelectedAdvisor(null);
+                handleEdit(selectedAdvisor);
+              }}>
+                <Edit2 size={16} /> Editar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="modal-overlay">
