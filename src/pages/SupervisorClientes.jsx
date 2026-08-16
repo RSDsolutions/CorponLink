@@ -1163,6 +1163,13 @@ export default function SupervisorClientes() {
                   <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>BA:</strong> {viewClient.ba || 'N/A'}</p>
                   <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>NPC:</strong> {viewClient.npc || 'N/A'}</p>
                 </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>Estado del Servicio</h4>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Estado:</strong> {viewClient.status}</p>
+                  {viewClient.activation_date && (
+                    <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Fecha Activación:</strong> {new Date(viewClient.activation_date).toLocaleDateString()}</p>
+                  )}
+                </div>
               </div>
               {viewClient.notes && (
                 <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#f8fafc', borderRadius: '4px', border: '1px solid var(--border)' }}>

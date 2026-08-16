@@ -39,9 +39,18 @@ export default function AdminClientes() {
   // Modal Estado / Soft Delete
   const [editingClient, setEditingClient] = useState(null);
   const [newStatus, setNewStatus] = useState('');
+  const [activationDate, setActivationDate] = useState('');
   const [deletionReason, setDeletionReason] = useState('Eliminado por mala digitación');
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [clientToDelete, setClientToDelete] = useState(null);
+
+  // Status messages
+  const STATUS_MESSAGES = {
+    'Ingresado': 'Cliente nuevo en el sistema, requiere contacto inicial.',
+    'Activo': 'Servicio instalado y activado. El cliente será bloqueado para cambios.',
+    'Cancelado': 'Cliente rechazó el servicio. Razones: No se pudo contactar o cliente no desea continuar.',
+    'Rechazado': 'Cliente rechazó Términos y Condiciones en el link de firma.'
+  };
 
   const fetchClients = async () => {
     try {
@@ -114,31 +123,48 @@ export default function AdminClientes() {
 
   const activeClients = filteredClients.filter(c => c.status !== 'Eliminado');
   const total = activeClients.length;
-  const activos = activeClients.filter(c => c.status === 'Instalado').length;
-  const pendientes = activeClients.filter(c => ['Contactado', 'Aprobado'].includes(c.status)).length;
+  const activos = activeClients.filter(c => c.status === 'Activo').length;
+  const pendientes = activeClients.filter(c => ['Ingresado'].includes(c.status)).length;
   const eliminados = filteredClients.filter(c => c.status === 'Eliminado').length;
 
   const handleStatusChange = async (e) => {
     e.preventDefault();
-    if (newStatus === 'Eliminado') {
-      setClientToDelete(editingClient);
-      setDeletionReason('Eliminado por mala digitación');
-      setShowDeleteConfirmModal(true);
+    if (!editingClient || !newStatus) return;
+
+    // When setting to Activo, require an activation date
+    if (newStatus === 'Activo' && !activationDate) {
+      alert('Por favor selecciona una fecha de activación.');
       return;
     }
 
     try {
+      const updateData = {
+        status: newStatus,
+        status_blocked: newStatus === 'Activo' ? true : false
+      };
+
+      // Set activation_date only for Activo status
+      if (newStatus === 'Activo') {
+        updateData.activation_date = activationDate;
+      } else {
+        updateData.activation_date = null;
+      }
+
       const { error } = await supabase
         .from('clients')
-        .update({ status: newStatus })
+        .update(updateData)
         .eq('id', editingClient.id);
 
       if (error) throw error;
       setEditingClient(null);
+      setNewStatus('');
+      setActivationDate('');
       fetchClients();
+      alert(`Estado actualizado a "${newStatus}" correctamente.`);
     } catch (error) {
       alert('Error actualizando estado: ' + error.message);
     }
+  };
   };
 
   const confirmSoftDeleteClient = async () => {
@@ -187,6 +213,7 @@ export default function AdminClientes() {
       'BA': c.ba || '',
       'NPC': c.npc || '',
       'Estado Actual': c.status,
+      'Fecha de Activación': c.activation_date ? new Date(c.activation_date).toLocaleDateString() : '',
       'Motivo Eliminación': c.deletion_reason || '',
       'Notas': c.notes || ''
     }));
@@ -196,7 +223,7 @@ export default function AdminClientes() {
       { wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 35 }, { wch: 30 },
       { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 15 },
       { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-      { wch: 15 }, { wch: 30 }, { wch: 30 }
+      { wch: 15 }, { wch: 18 }, { wch: 30 }, { wch: 30 }
     ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Clientes CorponNet');
@@ -362,6 +389,11 @@ export default function AdminClientes() {
                     </td>
                     <td>
                       <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
+                      {c.activation_date && (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                          Activado: {new Date(c.activation_date).toLocaleDateString()}
+                        </div>
+                      )}
                       {isEliminado && c.deletion_reason && (
                         <div style={{ fontSize: '0.72rem', color: 'var(--status-danger-text)', marginTop: '0.2rem' }}>
                           Motivo: {c.deletion_reason}
@@ -370,7 +402,13 @@ export default function AdminClientes() {
                     </td>
                     <td>
                       {!isEliminado ? (
-                        <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }}>
+                        <button 
+                          className="btn btn-sm btn-secondary" 
+                          onClick={() => { setEditingClient(c); setNewStatus(c.status); setActivationDate(c.activation_date || ''); }}
+                          disabled={c.status_blocked}
+                          style={{ opacity: c.status_blocked ? 0.5 : 1, cursor: c.status_blocked ? 'not-allowed' : 'pointer' }}
+                          title={c.status_blocked ? 'Cliente bloqueado (Activo)' : 'Editar estado'}
+                        >>
                           Estado
                         </button>
                       ) : (
@@ -391,9 +429,9 @@ export default function AdminClientes() {
       {/* Modal Actualizar Estado */}
       {editingClient && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '420px' }}>
+          <div className="modal-content" style={{ maxWidth: '500px' }}>
             <div className="modal-header">
-              <h3 style={{ margin: 0 }}>Actualizar Estado</h3>
+              <h3 style={{ margin: 0 }}>Actualizar Estado del Cliente</h3>
               <button onClick={() => setEditingClient(null)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
                 <X size={20} />
               </button>
@@ -402,22 +440,91 @@ export default function AdminClientes() {
               <p style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
                 Cliente: <strong style={{ color: 'var(--primary)' }}>{editingClient.first_name} {editingClient.last_name}</strong>
               </p>
-              <form onSubmit={handleStatusChange}>
-                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                  <label className="form-label">Nuevo Estado</label>
-                  <select className="form-select" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-                    <option value="Contactado">Contactado</option>
-                    <option value="Aprobado">Aprobado</option>
-                    <option value="Instalado">Instalado</option>
-                    <option value="Cancelado">Cancelado</option>
-                    <option value="Rechazado">Rechazado</option>
-                  </select>
+
+              {/* Current status info */}
+              {editingClient.status_blocked && (
+                <div style={{
+                  padding: '0.75rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '6px',
+                  marginBottom: '1rem',
+                  fontSize: '0.85rem',
+                  color: '#ef4444',
+                  fontWeight: 600
+                }}>
+                  ⛔ Este cliente está bloqueado (Activo). El estado no puede ser modificado.
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setEditingClient(null)}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar</button>
+              )}
+
+              {!editingClient.status_blocked && (
+                <form onSubmit={handleStatusChange}>
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label className="form-label">Nuevo Estado *</label>
+                    <select 
+                      className="form-select" 
+                      value={newStatus} 
+                      onChange={(e) => {
+                        setNewStatus(e.target.value);
+                        setActivationDate('');
+                      }}
+                      required
+                    >
+                      <option value="">Selecciona un estado</option>
+                      <option value="Ingresado">Ingresado</option>
+                      <option value="Activo">Activo</option>
+                      <option value="Cancelado">Cancelado</option>
+                      <option value="Rechazado">Rechazado</option>
+                    </select>
+                  </div>
+
+                  {/* Status message */}
+                  {newStatus && (
+                    <div style={{
+                      padding: '0.875rem',
+                      backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      borderRadius: '6px',
+                      marginBottom: '1.5rem',
+                      fontSize: '0.85rem',
+                      color: '#1e40af',
+                      lineHeight: '1.5'
+                    }}>
+                      <strong>ℹ️ {newStatus}:</strong><br />
+                      {STATUS_MESSAGES[newStatus]}
+                    </div>
+                  )}
+
+                  {/* Activation date picker for Activo status */}
+                  {newStatus === 'Activo' && (
+                    <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                      <label className="form-label">Fecha de Activación del Servicio *</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={activationDate}
+                        onChange={(e) => setActivationDate(e.target.value)}
+                        required
+                        max={new Date().toISOString().split('T')[0]}
+                      />
+                      <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                        Fecha cuando se instaló y activó el servicio (correo: "Oportunidad Ganada")
+                      </small>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setEditingClient(null)}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar Estado</button>
+                  </div>
+                </form>
+              )}
+
+              {editingClient.status_blocked && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditingClient(null)}>Cerrar</button>
                 </div>
-              </form>
+              )}
             </div>
           </div>
         </div>
