@@ -111,11 +111,32 @@ export default function SupervisorClientes() {
       if (clientsError) throw clientsError;
       setClients(clientsData || []);
 
-      const { data: advisorsData } = await supabase
-        .from('advisors')
-        .select('*')
+      // Get advisors assigned to this supervisor via supervisor_advisors junction table
+      const { data: assignmentData, error: assignmentError } = await supabase
+        .from('supervisor_advisors')
+        .select('advisor_id, advisors(*)')
         .eq('supervisor_id', user.id);
-      setAdvisorsList(advisorsData || []);
+
+      if (assignmentError) throw assignmentError;
+
+      // Extract advisor data and add supervisor as option
+      const advisors = assignmentData?.map(item => item.advisors) || [];
+      const supervisorOption = {
+        id: user.id,
+        code: 'SUP-' + user.id.slice(0, 8).toUpperCase(),
+        first_name: 'Tú',
+        second_name: '(Supervisor)',
+        first_surname: '',
+        second_surname: '',
+        document_id: null,
+        city: null,
+        address: null,
+        email: null,
+        phone: null,
+        is_supervisor: true
+      };
+
+      setAdvisorsList([supervisorOption, ...advisors]);
     } catch (error) {
       console.error('Error fetching clients:', error.message);
     } finally {
@@ -554,18 +575,21 @@ export default function SupervisorClientes() {
                   <User size={16} />
                   <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <strong>Asesor (Vendedor) *</strong>
-                    <select 
-                      name="advisor_id" 
-                      className="form-select" 
+                    <select
+                      name="advisor_id"
+                      className="form-select"
                       style={{ padding: '0.25rem 0.5rem', minWidth: '200px', backgroundColor: 'white' }}
                       required
-                      value={formData.advisor_id} 
+                      value={formData.advisor_id}
                       onChange={handleChange}
                     >
                       <option value="">Selecciona un asesor...</option>
-                      {advisorsList.map(a => (
-                        <option key={a.id} value={a.id}>{a.code} - {a.full_name}</option>
-                      ))}
+                      {advisorsList.map(a => {
+                        const displayName = a.is_supervisor
+                          ? `${a.code} - Tú (Supervisor)`
+                          : `${a.code} - ${a.first_name} ${a.second_name} ${a.first_surname} ${a.second_surname}`.trim();
+                        return <option key={a.id} value={a.id}>{displayName}</option>;
+                      })}
                     </select>
                   </div>
                 </div>
@@ -755,7 +779,7 @@ export default function SupervisorClientes() {
               <p style={{ marginBottom: '1rem', fontSize: '0.9rem' }}>
                 El cliente <strong>{clientToDelete.first_name} {clientToDelete.last_name}</strong> (Cédula: {clientToDelete.document_id}) será cambiado al estado de borrado lógico (<strong>Eliminado</strong>).
               </p>
-              
+
               <div style={{
                 padding: '0.875rem',
                 backgroundColor: 'rgba(239, 68, 68, 0.08)',

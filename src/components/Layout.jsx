@@ -40,9 +40,14 @@ export default function Layout({ children, role, userProfile }) {
         </NavLink>
       )}
       {role === 'admin' && (
-        <NavLink to="/users" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
-          <Users size={20} /> Gestión de Usuarios
-        </NavLink>
+        <>
+          <NavLink to="/admin/asesores" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+            <Users size={20} /> Gestión de Asesores
+          </NavLink>
+          <NavLink to="/users" className={({ isActive }) => `menu-item ${isActive ? 'active' : ''}`} onClick={closeSidebar}>
+            <Users size={20} /> Gestión de Usuarios
+          </NavLink>
+        </>
       )}
       <button onClick={handleLogout} className="menu-item danger">
         <LogOut size={20} /> Cerrar Sesión

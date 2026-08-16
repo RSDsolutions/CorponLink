@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminClientes from './pages/AdminClientes';
 import AdminRutas from './pages/AdminRutas';
+import AdminAsesores from './pages/AdminAsesores';
 import SupervisorDashboard from './pages/SupervisorDashboard';
 import SupervisorClientes from './pages/SupervisorClientes';
 import SupervisorRutas from './pages/SupervisorRutas';
@@ -198,6 +199,18 @@ function App() {
               <Navigate to="/login" replace />
             ) : isAdmin ? (
               withLayout(<AdminUsers />)
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin/asesores"
+          element={
+            !session ? (
+              <Navigate to="/login" replace />
+            ) : isAdmin ? (
+              withLayout(<AdminAsesores />)
             ) : (
               <Navigate to="/" replace />
             )
