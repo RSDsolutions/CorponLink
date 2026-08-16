@@ -74,8 +74,9 @@ export default function AdminAsesores() {
         .select(`
           *,
           supervisor_advisors (
+            id,
             supervisor_id,
-            profiles:profiles (id, full_name)
+            profiles:profiles!supervisor_advisors_supervisor_id_fkey (id, full_name)
           )
         `)
         .order('code', { ascending: true });
@@ -304,8 +305,8 @@ export default function AdminAsesores() {
         alert('Asesor creado correctamente.');
       }
 
+      await fetchAdvisors();
       setShowModal(false);
-      fetchAdvisors();
     } catch (error) {
       alert('Error: ' + error.message);
     }
@@ -337,7 +338,7 @@ export default function AdminAsesores() {
 
   const getSupervisorName = (advisor) => {
     const assignment = advisor.supervisor_advisors?.[0];
-    return assignment?.profiles?.full_name || 'Sin asignar';
+    return assignment?.profiles?.full_name || assignment?.supervisor?.full_name || 'Sin asignar';
   };
 
   const cityOptions = [
