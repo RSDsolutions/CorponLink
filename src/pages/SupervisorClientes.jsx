@@ -147,7 +147,20 @@ export default function SupervisorClientes() {
 
       const { data: clientsData, error: clientsError } = await supabase
         .from('clients')
-        .select('*')
+        .select(`
+          *,
+          advisors:advisor_id (
+            id,
+            code,
+            full_name,
+            first_name,
+            second_name,
+            first_surname,
+            second_surname,
+            city,
+            province
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (clientsError) throw clientsError;
@@ -169,24 +182,9 @@ export default function SupervisorClientes() {
 
       if (assignmentError) throw assignmentError;
 
-      // Extract advisor data and add supervisor as option
-      const advisors = assignmentData?.map(item => item.advisors) || [];
-      const supervisorOption = {
-        id: user.id,
-        code: profileData?.code || 'SUP-XXX-001',
-        first_name: profileData?.first_name || 'Tú',
-        second_name: profileData?.second_name || '(Supervisor)',
-        first_surname: profileData?.first_surname || '',
-        second_surname: profileData?.second_surname || '',
-        document_id: profileData?.document_id || null,
-        city: profileData?.city || null,
-        address: profileData?.address || null,
-        email: profileData?.email || null,
-        phone: profileData?.phone || null,
-        is_supervisor: true
-      };
-
-      setAdvisorsList([supervisorOption, ...advisors]);
+      // Only allow real advisor records to be selected for client assignment.
+      const advisors = (assignmentData?.map(item => item.advisors).filter(Boolean) || []).filter(a => a.id);
+      setAdvisorsList(advisors);
     } catch (error) {
       console.error('Error fetching clients:', error.message);
     } finally {
@@ -291,6 +289,11 @@ export default function SupervisorClientes() {
         (!formData.bank_account_type || !formData.bank_name)
       ) {
         alert('Por favor completa el tipo de tarjeta y el banco.');
+        return;
+      }
+
+      if (!formData.advisor_id) {
+        alert('Debes seleccionar un asesor válido antes de guardar el cliente.');
         return;
       }
 
@@ -743,12 +746,14 @@ export default function SupervisorClientes() {
                       onChange={handleChange}
                     >
                       <option value="">Selecciona un asesor...</option>
-                      {advisorsList.map(a => {
-                        const displayName = a.is_supervisor
-                          ? `${a.code} - Tú (Supervisor)`
-                          : `${a.code} - ${a.first_name} ${a.second_name} ${a.first_surname} ${a.second_surname}`.trim();
-                        return <option key={a.id} value={a.id}>{displayName}</option>;
-                      })}
+                      {advisorsList.length === 0 ? (
+                        <option value="" disabled>No tienes asesores asignados</option>
+                      ) : (
+                        advisorsList.map(a => {
+                          const displayName = `${a.code} - ${a.first_name || ''} ${a.second_name || ''} ${a.first_surname || ''} ${a.second_surname || ''}`.trim();
+                          return <option key={a.id} value={a.id}>{displayName}</option>;
+                        })
+                      )}
                     </select>
                   </div>
                 </div>
@@ -1149,6 +1154,19 @@ export default function SupervisorClientes() {
                   <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><MapPin size={14} /> Ubicación</h4>
                   <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Dirección:</strong> {viewClient.address}</p>
                   <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Referencia:</strong> {viewClient.housing_reference}</p>
+                </div>
+                <div>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><User size={14} /> Asesor asignado</h4>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>
+                    <strong>Asesor:</strong>{' '}
+                    {viewClient.advisors?.full_name ||
+                      (viewClient.advisors?.first_name || viewClient.advisor_id ?
+                        `${viewClient.advisors?.first_name || ''} ${viewClient.advisors?.second_name || ''} ${viewClient.advisors?.first_surname || ''} ${viewClient.advisors?.second_surname || ''}`.trim() || 'Sin nombre' :
+                        'Sin asignar')}
+                  </p>
+                  {viewClient.advisors?.code && (
+                    <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Código:</strong> {viewClient.advisors.code}</p>
+                  )}
                 </div>
                 <div>
                   <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><CreditCard size={14} /> Pago y Plan</h4>
