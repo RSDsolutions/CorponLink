@@ -39,6 +39,17 @@ export default function SupervisorRutas() {
     observaciones: ''
   });
 
+  // Modal Edición de Ruta abierta
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [routeToEdit, setRouteToEdit] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    sector_name: '',
+    provincia: '',
+    barrio: '',
+    hora_inicio: '',
+    change_reason: ''
+  });
+
   // Modal Borrado Lógico
   const [routeToDelete, setRouteToDelete] = useState(null);
   const [deletionReason, setDeletionReason] = useState('Eliminado por mala digitación');
@@ -71,6 +82,7 @@ export default function SupervisorRutas() {
 
   const handleOpenChange = (e) => setOpenFormData({ ...openFormData, [e.target.name]: e.target.value });
   const handleCloseChange = (e) => setCloseFormData({ ...closeFormData, [e.target.name]: e.target.value });
+  const handleEditChange = (e) => setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
 
   // Apertura de Ruta
   const handleOpenSubmit = async (e) => {
@@ -129,6 +141,39 @@ export default function SupervisorRutas() {
       fetchRoutes();
     } catch (error) {
       alert('Error cerrando ruta: ' + error.message);
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!routeToEdit) return;
+    if (!editFormData.change_reason?.trim()) {
+      alert('Debes indicar el motivo del cambio antes de guardar la ruta abierta.');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('routes')
+        .update({
+          sector_name: editFormData.sector_name.trim(),
+          provincia: editFormData.provincia.trim(),
+          barrio: editFormData.barrio.trim(),
+          hora_inicio: editFormData.hora_inicio,
+          last_change_reason: editFormData.change_reason.trim(),
+          last_changed_at: new Date().toISOString()
+        })
+        .eq('id', routeToEdit.id)
+        .eq('status', 'Abierta');
+
+      if (error) throw error;
+      setShowEditModal(false);
+      setRouteToEdit(null);
+      setEditFormData({ sector_name: '', provincia: '', barrio: '', hora_inicio: '', change_reason: '' });
+      fetchRoutes();
+      alert('Ruta actualizada correctamente.');
+    } catch (error) {
+      alert('Error editando ruta abierta: ' + error.message);
     }
   };
 
@@ -292,22 +337,40 @@ export default function SupervisorRutas() {
                       {!isEliminada && (
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           {isAbierta && (
-                            <button
-                              className="btn btn-sm btn-primary"
-                              onClick={() => {
-                                setRouteToClose(r);
-                                setCloseFormData({
-                                  hora_fin: '',
-                                  total_visitas: '',
-                                  total_ventas: '',
-                                  sector_rating: '7',
-                                  observaciones: ''
-                                });
-                                setShowCloseModal(true);
-                              }}
-                            >
-                              <Lock size={14} /> Cerrar
-                            </button>
+                            <>
+                              <button
+                                className="btn btn-sm btn-secondary"
+                                onClick={() => {
+                                  setRouteToEdit(r);
+                                  setEditFormData({
+                                    sector_name: r.sector_name || '',
+                                    provincia: r.provincia || '',
+                                    barrio: r.barrio || '',
+                                    hora_inicio: r.hora_inicio || '',
+                                    change_reason: ''
+                                  });
+                                  setShowEditModal(true);
+                                }}
+                              >
+                                Editar
+                              </button>
+                              <button
+                                className="btn btn-sm btn-primary"
+                                onClick={() => {
+                                  setRouteToClose(r);
+                                  setCloseFormData({
+                                    hora_fin: '',
+                                    total_visitas: '',
+                                    total_ventas: '',
+                                    sector_rating: '7',
+                                    observaciones: ''
+                                  });
+                                  setShowCloseModal(true);
+                                }}
+                              >
+                                <Lock size={14} /> Cerrar
+                              </button>
+                            </>
                           )}
                           <button
                             className="btn btn-sm"
@@ -375,6 +438,59 @@ export default function SupervisorRutas() {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
                   <button type="button" className="btn btn-secondary" onClick={() => setShowOpenModal(false)}>Cancelar</button>
                   <button type="submit" className="btn btn-primary"><Save size={18} /> Aperturar Ruta</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Ruta Abierta */}
+      {showEditModal && routeToEdit && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <div>
+                <h3 style={{ margin: 0 }}>Editar Ruta Abierta</h3>
+                <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>Sector: {routeToEdit.sector_name}</p>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="btn btn-icon btn-secondary" style={{ border: 'none' }}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleEditSubmit}>
+                <div className="form-group">
+                  <label className="form-label">Nombre del Sector *</label>
+                  <input type="text" name="sector_name" className="form-input" required value={editFormData.sector_name} onChange={handleEditChange} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Provincia *</label>
+                  <input type="text" name="provincia" className="form-input" required value={editFormData.provincia} onChange={handleEditChange} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Barrio / Localidad *</label>
+                  <input type="text" name="barrio" className="form-input" required value={editFormData.barrio} onChange={handleEditChange} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Hora de Inicio *</label>
+                  <input type="time" name="hora_inicio" className="form-input" required value={editFormData.hora_inicio} onChange={handleEditChange} />
+                </div>
+                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                  <label className="form-label">Motivo del Cambio *</label>
+                  <textarea
+                    name="change_reason"
+                    className="form-textarea"
+                    rows="3"
+                    required
+                    placeholder="Ej: Se ajustó el sector por cierre de vía" 
+                    value={editFormData.change_reason}
+                    onChange={handleEditChange}
+                  />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancelar</button>
+                  <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar Cambios</button>
                 </div>
               </form>
             </div>
