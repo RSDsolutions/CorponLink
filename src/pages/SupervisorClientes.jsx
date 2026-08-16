@@ -1,6 +1,45 @@
 import { useState, useEffect } from 'react';
 import { supabase, getCurrentAuthUser } from '../services/supabase';
-import { Users, X, Save, Plus, AlertTriangle, ShieldCheck, Trash2, Cpu, CreditCard, MapPin, User, Phone, Mail, FileText } from 'lucide-react';
+import { Users, X, Save, Plus, AlertTriangle, ShieldCheck, Trash2, Cpu, CreditCard, MapPin, User, Mail, FileText } from 'lucide-react';
+
+const PAYMENT_METHODS = {
+  BANK_ACCOUNT: 'Cuenta Bancaria',
+  CREDIT_CARD: 'Tarjeta de Crédito',
+  WINDOW_PAYMENT: 'Pago en ventanilla'
+};
+
+const BANK_OPTIONS = [
+  { value: 'Pichincha', label: 'Banco Pichincha' },
+  { value: 'Guayaquil', label: 'Banco de Guayaquil' },
+  { value: 'Pacífico', label: 'Banco del Pacífico' },
+  { value: 'Produbanco', label: 'Produbanco' },
+  { value: 'Bolivariano', label: 'Banco Bolivariano' },
+  { value: 'Internacional', label: 'Banco Internacional' },
+  { value: 'Machala', label: 'Banco de Machala' },
+  { value: 'Austro', label: 'Banco del Austro' },
+  { value: 'Cooperativa JEP', label: 'Cooperativa JEP' },
+  { value: 'Otro', label: 'Otro' }
+];
+
+const CARD_TYPE_OPTIONS = ['Visa', 'Mastercard', 'American Express', 'Diners Club', 'Discover', 'Otro'];
+
+const getPaymentSummary = (client) => {
+  const bankName = client.bank_name || '';
+  const accountType = client.bank_account_type || '';
+  const accountNumber = client.bank_account_number || '';
+
+  if (bankName === PAYMENT_METHODS.WINDOW_PAYMENT || accountType === PAYMENT_METHODS.WINDOW_PAYMENT || accountNumber === PAYMENT_METHODS.WINDOW_PAYMENT) {
+    return PAYMENT_METHODS.WINDOW_PAYMENT;
+  }
+
+  if (accountNumber === PAYMENT_METHODS.CREDIT_CARD) {
+    return [PAYMENT_METHODS.CREDIT_CARD, accountType, bankName].filter(Boolean).join(' - ');
+  }
+
+  if (!bankName && !accountType && !accountNumber) return '';
+
+  return `${bankName}${accountType || accountNumber ? ` (${accountType}): ${accountNumber}` : ''}`;
+};
 
 export default function SupervisorClientes() {
   const [clients, setClients] = useState([]);
@@ -19,6 +58,7 @@ export default function SupervisorClientes() {
     reference_phone: '',
     address: '',
     housing_reference: '',
+    payment_method: PAYMENT_METHODS.BANK_ACCOUNT,
     bank_account_number: '',
     bank_account_type: 'Ahorros',
     bank_name: '',
@@ -146,7 +186,26 @@ export default function SupervisorClientes() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === 'payment_method') {
+      setFormData(prev => ({
+        ...prev,
+        payment_method: value,
+        bank_account_number: '',
+        bank_account_type: value === PAYMENT_METHODS.BANK_ACCOUNT
+          ? 'Ahorros'
+          : value === PAYMENT_METHODS.CREDIT_CARD
+            ? ''
+            : PAYMENT_METHODS.WINDOW_PAYMENT,
+        bank_name: value === PAYMENT_METHODS.WINDOW_PAYMENT ? PAYMENT_METHODS.WINDOW_PAYMENT : ''
+      }));
+      return;
+    }
+
+    setFormData({ ...formData, [name]: value });
+  };
 
   // Guardar nuevo cliente
   const handleSubmit = async (e) => {
@@ -159,9 +218,47 @@ export default function SupervisorClientes() {
       }
 
       const planNameFull = `${formData.plan_family} - ${formData.bandwidth}`;
+      const selectedPaymentMethod = formData.payment_method || PAYMENT_METHODS.BANK_ACCOUNT;
+
+      if (
+        selectedPaymentMethod === PAYMENT_METHODS.BANK_ACCOUNT &&
+        (!formData.bank_account_number || !formData.bank_account_type || !formData.bank_name)
+      ) {
+        alert('Por favor completa los datos de la cuenta bancaria.');
+        return;
+      }
+
+      if (
+        selectedPaymentMethod === PAYMENT_METHODS.CREDIT_CARD &&
+        (!formData.bank_account_type || !formData.bank_name)
+      ) {
+        alert('Por favor completa el tipo de tarjeta y el banco.');
+        return;
+      }
+
+      const { payment_method: _paymentMethod, ...clientFormData } = formData;
+      const paymentFields = selectedPaymentMethod === PAYMENT_METHODS.WINDOW_PAYMENT
+        ? {
+            bank_account_number: PAYMENT_METHODS.WINDOW_PAYMENT,
+            bank_account_type: PAYMENT_METHODS.WINDOW_PAYMENT,
+            bank_name: PAYMENT_METHODS.WINDOW_PAYMENT
+          }
+        : selectedPaymentMethod === PAYMENT_METHODS.CREDIT_CARD
+          ? {
+              bank_account_number: PAYMENT_METHODS.CREDIT_CARD,
+              bank_account_type: formData.bank_account_type,
+              bank_name: formData.bank_name
+            }
+          : {
+              bank_account_number: formData.bank_account_number,
+              bank_account_type: formData.bank_account_type,
+              bank_name: formData.bank_name
+            };
 
       const { error } = await supabase.from('clients').insert([{
-        ...formData,
+        ...clientFormData,
+        ...paymentFields,
+        notes: formData.notes?.trim() || '',
         plan_name: planNameFull,
         plan_price_no_iva: formData.plan_price_no_iva ? parseFloat(formData.plan_price_no_iva) : 0,
         status: 'Contactado',
@@ -342,6 +439,7 @@ export default function SupervisorClientes() {
   const totalActivos = activeClients.filter(c => c.status === 'Instalado').length;
   const totalPendientes = activeClients.filter(c => ['Contactado', 'Aprobado'].includes(c.status)).length;
   const totalEliminados = clients.filter(c => c.status === 'Eliminado').length;
+  const selectedPaymentMethod = formData.payment_method || PAYMENT_METHODS.BANK_ACCOUNT;
 
   return (
     <div>
@@ -391,7 +489,7 @@ export default function SupervisorClientes() {
               <tr>
                 <th>Cliente y Documento</th>
                 <th>Contacto y Ubicación</th>
-                <th>Plan y Banco</th>
+                <th>Plan y Pago</th>
                 <th>Datos Técnicos (CA, BA, NPC)</th>
                 <th>Estado</th>
                 <th>Acciones</th>
@@ -401,6 +499,7 @@ export default function SupervisorClientes() {
               {clients.map(c => {
                 const hasTechData = Boolean(c.ca && c.ba && c.npc);
                 const isEliminado = c.status === 'Eliminado';
+                const paymentSummary = getPaymentSummary(c);
 
                 return (
                   <tr key={c.id} style={{ opacity: isEliminado ? 0.7 : 1, backgroundColor: isEliminado ? 'rgba(239, 68, 68, 0.03)' : 'transparent', cursor: 'pointer' }} onClick={() => setViewClient(c)}>
@@ -430,10 +529,10 @@ export default function SupervisorClientes() {
                           Promo: {c.promotion}
                         </span>
                       )}
-                      {c.bank_name && (
+                      {paymentSummary && (
                         <div className="client-doc" style={{ marginTop: '0.25rem' }}>
                           <CreditCard size={11} style={{ display: 'inline', marginRight: 3 }} />
-                          {c.bank_name} ({c.bank_account_type}): {c.bank_account_number}
+                          {paymentSummary}
                         </div>
                       )}
                     </td>
@@ -640,40 +739,76 @@ export default function SupervisorClientes() {
                   </div>
                 </div>
 
-                {/* Seccion 3: Cuenta Bancaria */}
+                {/* Seccion 3: Forma de Pago */}
                 <h4 style={{ fontSize: '0.9rem', color: 'var(--primary)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <CreditCard size={15} /> 3. Cuenta Bancaria
+                  <CreditCard size={15} /> 3. Forma de Pago
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.875rem', marginBottom: '1.25rem' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Número de Cuenta *</label>
-                    <input type="text" name="bank_account_number" className="form-input" required pattern="^[0-9]+$" title="Solo números" placeholder="N° de cuenta bancaria" value={formData.bank_account_number} onChange={handleChange} />
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Tipo de Cuenta *</label>
-                    <select name="bank_account_type" className="form-select" required value={formData.bank_account_type} onChange={handleChange}>
-                      <option value="Ahorros">Ahorros</option>
-                      <option value="Corriente">Corriente</option>
-                      <option value="Básica">Básica</option>
-                      <option value="Otro">Otro</option>
+                    <label className="form-label">Forma de Pago *</label>
+                    <select name="payment_method" className="form-select" required value={selectedPaymentMethod} onChange={handleChange}>
+                      <option value={PAYMENT_METHODS.BANK_ACCOUNT}>Cuenta Bancaria</option>
+                      <option value={PAYMENT_METHODS.CREDIT_CARD}>Tarjeta de Crédito</option>
+                      <option value={PAYMENT_METHODS.WINDOW_PAYMENT}>Pago en ventanilla</option>
                     </select>
                   </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Banco *</label>
-                    <select name="bank_name" className="form-select" required value={formData.bank_name} onChange={handleChange}>
-                      <option value="">Seleccione el Banco...</option>
-                      <option value="Pichincha">Banco Pichincha</option>
-                      <option value="Guayaquil">Banco de Guayaquil</option>
-                      <option value="Pacífico">Banco del Pacífico</option>
-                      <option value="Produbanco">Produbanco</option>
-                      <option value="Bolivariano">Banco Bolivariano</option>
-                      <option value="Internacional">Banco Internacional</option>
-                      <option value="Machala">Banco de Machala</option>
-                      <option value="Austro">Banco del Austro</option>
-                      <option value="Cooperativa JEP">Cooperativa JEP</option>
-                      <option value="Otro">Otro</option>
-                    </select>
-                  </div>
+
+                  {selectedPaymentMethod === PAYMENT_METHODS.BANK_ACCOUNT && (
+                    <>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Número de Cuenta *</label>
+                        <input type="text" name="bank_account_number" className="form-input" required pattern="^[0-9]+$" title="Solo números" placeholder="N° de cuenta bancaria" value={formData.bank_account_number} onChange={handleChange} />
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Tipo de Cuenta *</label>
+                        <select name="bank_account_type" className="form-select" required value={formData.bank_account_type} onChange={handleChange}>
+                          <option value="Ahorros">Ahorros</option>
+                          <option value="Corriente">Corriente</option>
+                          <option value="Básica">Básica</option>
+                          <option value="Otro">Otro</option>
+                        </select>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Banco *</label>
+                        <select name="bank_name" className="form-select" required value={formData.bank_name} onChange={handleChange}>
+                          <option value="">Seleccione el Banco...</option>
+                          {BANK_OPTIONS.map(bank => (
+                            <option key={bank.value} value={bank.value}>{bank.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedPaymentMethod === PAYMENT_METHODS.CREDIT_CARD && (
+                    <>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Tipo de Tarjeta *</label>
+                        <select name="bank_account_type" className="form-select" required value={formData.bank_account_type} onChange={handleChange}>
+                          <option value="">Seleccione el tipo...</option>
+                          {CARD_TYPE_OPTIONS.map(cardType => (
+                            <option key={cardType} value={cardType}>{cardType}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="form-group" style={{ marginBottom: 0 }}>
+                        <label className="form-label">Banco *</label>
+                        <select name="bank_name" className="form-select" required value={formData.bank_name} onChange={handleChange}>
+                          <option value="">Seleccione el Banco...</option>
+                          {BANK_OPTIONS.map(bank => (
+                            <option key={bank.value} value={bank.value}>{bank.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedPaymentMethod === PAYMENT_METHODS.WINDOW_PAYMENT && (
+                    <div className="form-group" style={{ gridColumn: 'span 2', marginBottom: 0 }}>
+                      <label className="form-label">Registro de Pago</label>
+                      <input type="text" className="form-input" value={PAYMENT_METHODS.WINDOW_PAYMENT} readOnly style={{ backgroundColor: 'var(--surface-hover)', cursor: 'not-allowed' }} />
+                    </div>
+                  )}
                 </div>
 
                 {/* Seccion 4: Plan a Contratar */}
@@ -713,8 +848,8 @@ export default function SupervisorClientes() {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                  <label className="form-label">Notas Adicionales *</label>
-                  <textarea name="notes" className="form-textarea" required rows="2" placeholder="Observaciones o notas del contrato" value={formData.notes} onChange={handleChange}></textarea>
+                  <label className="form-label">Notas Adicionales</label>
+                  <textarea name="notes" className="form-textarea" rows="2" placeholder="Observaciones o notas del contrato (opcional)" value={formData.notes} onChange={handleChange}></textarea>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
@@ -955,9 +1090,8 @@ export default function SupervisorClientes() {
                   <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Referencia:</strong> {viewClient.housing_reference}</p>
                 </div>
                 <div>
-                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><CreditCard size={14} /> Banco y Plan</h4>
-                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Banco:</strong> {viewClient.bank_name}</p>
-                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Cuenta ({viewClient.bank_account_type}):</strong> {viewClient.bank_account_number}</p>
+                  <h4 style={{ fontSize: '0.85rem', color: 'var(--primary)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}><CreditCard size={14} /> Pago y Plan</h4>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Forma de Pago:</strong> {getPaymentSummary(viewClient) || 'N/A'}</p>
                   <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Plan:</strong> {viewClient.plan_family} - {viewClient.bandwidth}</p>
                   <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Promoción:</strong> {viewClient.promotion}</p>
                   <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}><strong>Precio (Sin IVA):</strong> ${Number(viewClient.plan_price_no_iva).toLocaleString('es-CO')}</p>

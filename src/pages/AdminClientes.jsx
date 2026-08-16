@@ -3,6 +3,28 @@ import { supabase } from '../services/supabase';
 import { Download, Search, Globe, Users, CheckCircle, MapPin, Trash2, Cpu, CreditCard, AlertTriangle, X, Save } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+const PAYMENT_METHODS = {
+  CREDIT_CARD: 'Tarjeta de Crédito',
+  WINDOW_PAYMENT: 'Pago en ventanilla'
+};
+
+const isWindowPayment = (client) =>
+  client.bank_name === PAYMENT_METHODS.WINDOW_PAYMENT ||
+  client.bank_account_type === PAYMENT_METHODS.WINDOW_PAYMENT ||
+  client.bank_account_number === PAYMENT_METHODS.WINDOW_PAYMENT;
+
+const isCreditCardPayment = (client) => client.bank_account_number === PAYMENT_METHODS.CREDIT_CARD;
+
+const getPaymentSummary = (client) => {
+  if (isWindowPayment(client)) return PAYMENT_METHODS.WINDOW_PAYMENT;
+  if (isCreditCardPayment(client)) {
+    return [PAYMENT_METHODS.CREDIT_CARD, client.bank_account_type, client.bank_name].filter(Boolean).join(' - ');
+  }
+  if (!client.bank_name && !client.bank_account_type && !client.bank_account_number) return '';
+
+  return `${client.bank_name || ''}${client.bank_account_type || client.bank_account_number ? ` (${client.bank_account_type || ''}): ${client.bank_account_number || ''}` : ''}`;
+};
+
 export default function AdminClientes() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
