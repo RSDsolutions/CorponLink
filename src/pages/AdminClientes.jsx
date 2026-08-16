@@ -165,7 +165,6 @@ export default function AdminClientes() {
       alert('Error actualizando estado: ' + error.message);
     }
   };
-  };
 
   const confirmSoftDeleteClient = async () => {
     if (!clientToDelete) return;
@@ -280,9 +279,8 @@ export default function AdminClientes() {
             <div style={{ flex: '1 1 180px', minWidth: '180px', minWidth: 0 }}>
               <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="">Todos los estados</option>
-                <option value="Contactado">Contactado</option>
-                <option value="Aprobado">Aprobado</option>
-                <option value="Instalado">Instalado</option>
+                <option value="Ingresado">Ingresado</option>
+                <option value="Activo">Activo</option>
                 <option value="Cancelado">Cancelado</option>
                 <option value="Rechazado">Rechazado</option>
                 <option value="Eliminado">Eliminado (Borrado Lógico)</option>
@@ -402,13 +400,13 @@ export default function AdminClientes() {
                     </td>
                     <td>
                       {!isEliminado ? (
-                        <button 
-                          className="btn btn-sm btn-secondary" 
+                        <button
+                          className="btn btn-sm btn-secondary"
                           onClick={() => { setEditingClient(c); setNewStatus(c.status); setActivationDate(c.activation_date || ''); }}
                           disabled={c.status_blocked}
                           style={{ opacity: c.status_blocked ? 0.5 : 1, cursor: c.status_blocked ? 'not-allowed' : 'pointer' }}
                           title={c.status_blocked ? 'Cliente bloqueado (Activo)' : 'Editar estado'}
-                        >>
+                        >
                           Estado
                         </button>
                       ) : (
