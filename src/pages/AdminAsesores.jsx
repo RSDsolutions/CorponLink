@@ -103,9 +103,15 @@ export default function AdminAsesores() {
     fetchAdvisors();
   }, []);
 
-  const getNextAdvisorCode = (city, excludedAdvisorId = null, sourceAdvisors = advisors) => {
+  const getNextAdvisorCode = (city, excludedAdvisorId = null, sourceAdvisors = advisors, sourceSupervisors = supervisors) => {
     const prefix = getCityPrefix(city);
     if (!prefix) return '';
+
+    const supervisorExistsForCity = sourceSupervisors.some(supervisor => {
+      const sameCity = supervisor?.city && normalizeCity(supervisor.city) === normalizeCity(city);
+      const samePrefix = String(supervisor.code || '').toUpperCase().startsWith(`SUP-${prefix}-`);
+      return sameCity && samePrefix;
+    });
 
     const codePattern = new RegExp(`^${escapeRegExp(prefix)}-(\\d+)$`, 'i');
     const highestNumber = sourceAdvisors.reduce((highest, advisor) => {
@@ -116,7 +122,7 @@ export default function AdminAsesores() {
 
       const codeNumber = Number(match[1]);
       return Number.isNaN(codeNumber) ? highest : Math.max(highest, codeNumber);
-    }, 0);
+    }, supervisorExistsForCity ? 1 : 0);
 
     return `${prefix}-${String(highestNumber + 1).padStart(3, '0')}`;
   };

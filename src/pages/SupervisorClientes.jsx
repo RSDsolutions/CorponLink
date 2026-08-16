@@ -154,6 +154,14 @@ export default function SupervisorClientes() {
       setClients(clientsData || []);
 
       // Get advisors assigned to this supervisor via supervisor_advisors junction table
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profileError) throw profileError;
+
       const { data: assignmentData, error: assignmentError } = await supabase
         .from('supervisor_advisors')
         .select('advisor_id, advisors(*)')
@@ -165,16 +173,16 @@ export default function SupervisorClientes() {
       const advisors = assignmentData?.map(item => item.advisors) || [];
       const supervisorOption = {
         id: user.id,
-        code: 'SUP-' + user.id.slice(0, 8).toUpperCase(),
-        first_name: 'Tú',
-        second_name: '(Supervisor)',
-        first_surname: '',
-        second_surname: '',
-        document_id: null,
-        city: null,
-        address: null,
-        email: null,
-        phone: null,
+        code: profileData?.code || 'SUP-XXX-001',
+        first_name: profileData?.first_name || 'Tú',
+        second_name: profileData?.second_name || '(Supervisor)',
+        first_surname: profileData?.first_surname || '',
+        second_surname: profileData?.second_surname || '',
+        document_id: profileData?.document_id || null,
+        city: profileData?.city || null,
+        address: profileData?.address || null,
+        email: profileData?.email || null,
+        phone: profileData?.phone || null,
         is_supervisor: true
       };
 

@@ -1,0 +1,16 @@
+BEGIN;
+
+ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS first_name VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS second_name VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS first_surname VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS second_surname VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS city VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS code VARCHAR(50);
+
+UPDATE public.profiles
+SET code = 'SUP-' || UPPER(COALESCE(city, 'XXX')) || '-001'
+WHERE role = 'supervisor'
+  AND (code IS NULL OR code = '');
+
+COMMIT;

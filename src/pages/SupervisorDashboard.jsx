@@ -2,14 +2,61 @@ import { useState, useEffect } from 'react';
 import { supabase, getCurrentAuthUser } from '../services/supabase';
 import { Users, BarChart, CheckCircle, MapPin, User, Save, X } from 'lucide-react';
 
+const CITY_OPTIONS = [
+  { name: 'Quito', prefix: 'UIO' },
+  { name: 'Guayaquil', prefix: 'GYE' },
+  { name: 'Cuenca', prefix: 'CUE' },
+  { name: 'Manta', prefix: 'MTA' },
+  { name: 'Machala', prefix: 'MCH' },
+  { name: 'Loja', prefix: 'LOJ' },
+  { name: 'Ambato', prefix: 'AMB' },
+  { name: 'Santo Domingo', prefix: 'SDO' },
+  { name: 'Duran', prefix: 'DUR' },
+  { name: 'Milagro', prefix: 'MIL' },
+  { name: 'Portoviejo', prefix: 'PVO' },
+  { name: 'Esmeraldas', prefix: 'ESM' },
+  { name: 'Ibarra', prefix: 'IBA' },
+  { name: 'Riobamba', prefix: 'RIO' }
+];
+
+const normalizeCity = (city) => (city || '')
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .toUpperCase();
+
+const CITY_PREFIX_BY_NAME = Object.fromEntries(
+  CITY_OPTIONS.map(({ name, prefix }) => [normalizeCity(name), prefix])
+);
+
+const getCityPrefix = (city) => {
+  const normalized = normalizeCity(city);
+  if (!normalized) return '';
+
+  return CITY_PREFIX_BY_NAME[normalized] || normalized.replace(/[^A-Z0-9]/g, '').slice(0, 3).padEnd(3, 'X');
+};
+
+const getSupervisorCode = (city) => {
+  const prefix = getCityPrefix(city);
+  return prefix ? `SUP-${prefix}-001` : '';
+};
+
 export default function SupervisorDashboard() {
   const [stats, setStats] = useState({ totalClients: 0, pendientes: 0, activos: 0, totalRoutes: 0 });
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [profileForm, setProfileForm] = useState({
+    first_name: '',
+    second_name: '',
+    first_surname: '',
+    second_surname: '',
     full_name: '',
     document_id: '',
+    city: '',
+    code: '',
+    email: '',
     phone: '',
     address: ''
   });
@@ -33,8 +80,15 @@ export default function SupervisorDashboard() {
 
       if (data) {
         setProfileForm({
+          first_name: data.first_name || '',
+          second_name: data.second_name || '',
+          first_surname: data.first_surname || '',
+          second_surname: data.second_surname || '',
           full_name: data.full_name || '',
           document_id: data.document_id || '',
+          city: data.city || '',
+          code: data.code || '',
+          email: data.email || '',
           phone: data.phone || '',
           address: data.address || ''
         });
@@ -77,7 +131,11 @@ export default function SupervisorDashboard() {
 
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
-    setProfileForm(prev => ({ ...prev, [name]: value }));
+    setProfileForm(prev => ({
+      ...prev,
+      [name]: value,
+      code: name === 'city' ? getSupervisorCode(value) : prev.code
+    }));
   };
 
   const handleSaveProfile = async (e) => {
@@ -90,10 +148,30 @@ export default function SupervisorDashboard() {
         return;
       }
 
+      const firstName = profileForm.first_name.trim();
+      const secondName = profileForm.second_name.trim();
+      const firstSurname = profileForm.first_surname.trim();
+      const secondSurname = profileForm.second_surname.trim();
+      const city = profileForm.city.trim();
+      const resolvedCode = city ? getSupervisorCode(city) : profileForm.code || '';
+      const fullName = [firstName, secondName, firstSurname, secondSurname].filter(Boolean).join(' ');
+
+      if (!firstName || !firstSurname || !city) {
+        alert('Los campos Nombre, Primer Apellido y Ciudad son obligatorios.');
+        return;
+      }
+
       const payload = {
         id: user.id,
-        full_name: profileForm.full_name.trim(),
+        first_name: firstName,
+        second_name: secondName,
+        first_surname: firstSurname,
+        second_surname: secondSurname,
+        full_name: fullName,
         document_id: profileForm.document_id.trim(),
+        city,
+        code: resolvedCode,
+        email: profileForm.email.trim(),
         phone: profileForm.phone.trim(),
         address: profileForm.address.trim(),
         role: 'supervisor'
@@ -186,24 +264,52 @@ export default function SupervisorDashboard() {
             </div>
             <div className="modal-body">
               <form onSubmit={handleSaveProfile}>
-                <div className="form-group">
-                  <label className="form-label">Nombre completo *</label>
-                  <input type="text" name="full_name" className="form-input" required value={profileForm.full_name} onChange={handleProfileChange} />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Cédula</label>
-                  <input type="text" name="document_id" className="form-input" value={profileForm.document_id} onChange={handleProfileChange} />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Teléfono</label>
-                  <input type="text" name="phone" className="form-input" value={profileForm.phone} onChange={handleProfileChange} />
-                </div>
-
-                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                  <label className="form-label">Dirección</label>
-                  <textarea name="address" className="form-textarea" rows="3" value={profileForm.address} onChange={handleProfileChange}></textarea>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Primer Nombre *</label>
+                    <input type="text" name="first_name" className="form-input" required value={profileForm.first_name} onChange={handleProfileChange} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Segundo Nombre</label>
+                    <input type="text" name="second_name" className="form-input" value={profileForm.second_name} onChange={handleProfileChange} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Primer Apellido *</label>
+                    <input type="text" name="first_surname" className="form-input" required value={profileForm.first_surname} onChange={handleProfileChange} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Segundo Apellido</label>
+                    <input type="text" name="second_surname" className="form-input" value={profileForm.second_surname} onChange={handleProfileChange} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Cédula</label>
+                    <input type="text" name="document_id" className="form-input" value={profileForm.document_id} onChange={handleProfileChange} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Ciudad *</label>
+                    <select name="city" className="form-select" required value={profileForm.city} onChange={handleProfileChange}>
+                      <option value="">Seleccione la ciudad...</option>
+                      {CITY_OPTIONS.map(city => (
+                        <option key={city.name} value={city.name}>{city.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Código</label>
+                    <input type="text" className="form-input" value={profileForm.code || getSupervisorCode(profileForm.city)} readOnly style={{ backgroundColor: 'var(--surface-hover)', cursor: 'not-allowed' }} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Correo Electrónico</label>
+                    <input type="email" name="email" className="form-input" value={profileForm.email} onChange={handleProfileChange} />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label">Teléfono</label>
+                    <input type="text" name="phone" className="form-input" value={profileForm.phone} onChange={handleProfileChange} />
+                  </div>
+                  <div className="form-group" style={{ gridColumn: '1 / -1', marginBottom: '1.5rem' }}>
+                    <label className="form-label">Dirección</label>
+                    <textarea name="address" className="form-textarea" rows="3" value={profileForm.address} onChange={handleProfileChange}></textarea>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
