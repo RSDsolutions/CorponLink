@@ -114,7 +114,7 @@ export default function SupervisorDashboard() {
 
         setStats({
           totalClients: clients?.length || 0,
-          pendientes: clients?.filter(c => ['Registrado', 'Contactado', 'Programado'].includes(c.status)).length || 0,
+          pendientes: clients?.filter(c => ['Ingresado'].includes(c.status)).length || 0,
           activos: clients?.filter(c => c.status === 'Activo').length || 0,
           totalRoutes: routes?.length || 0
         });

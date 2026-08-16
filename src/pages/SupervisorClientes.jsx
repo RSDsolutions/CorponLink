@@ -23,6 +23,13 @@ const BANK_OPTIONS = [
 
 const CARD_TYPE_OPTIONS = ['Visa', 'Mastercard', 'American Express', 'Diners Club', 'Discover', 'Otro'];
 
+const STATUS_MESSAGES = {
+  'Ingresado': 'Cliente nuevo en el sistema, requiere contacto inicial.',
+  'Activo': 'Servicio instalado y activado. El cliente queda bloqueado para cambios de estado.',
+  'Cancelado': 'Se cancela porque no se pudo contactar al cliente o el cliente canceló el servicio.',
+  'Rechazado': 'El cliente rechazó los Términos y Condiciones en el link de firma.'
+};
+
 const getPaymentSummary = (client) => {
   const bankName = client.bank_name || '';
   const accountType = client.bank_account_type || '';
@@ -83,6 +90,7 @@ export default function SupervisorClientes() {
   // Modal Estado / Borrado Lógico
   const [editingClient, setEditingClient] = useState(null);
   const [newStatus, setNewStatus] = useState('');
+  const [activationDate, setActivationDate] = useState('');
   const [deletionReason, setDeletionReason] = useState('Eliminado por mala digitación');
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [clientToDelete, setClientToDelete] = useState(null);
@@ -324,7 +332,9 @@ export default function SupervisorClientes() {
         bandwidth: resolvedBandwidth || '',
         plan_price_no_iva: resolvedPlanPrice,
         notes: formData.notes?.trim() || '',
-        status: 'Contactado',
+        status: 'Ingresado',
+        status_blocked: false,
+        activation_date: null,
         asesor_id: user.id, // Legacy compatibility
         supervisor_id: user.id,
         advisor_id: formData.advisor_id || null
@@ -343,8 +353,14 @@ export default function SupervisorClientes() {
   // Actualizar estado general
   const handleStatusChange = async (e) => {
     e.preventDefault();
+    if (!editingClient || !newStatus) return;
+
+    if (newStatus === 'Activo' && !activationDate) {
+      alert('Por favor selecciona una fecha de activación.');
+      return;
+    }
+
     if (newStatus === 'Eliminado') {
-      // Iniciar proceso de borrado lógico
       setClientToDelete(editingClient);
       setDeletionReason('Eliminado por mala digitación');
       setShowDeleteConfirmModal(true);
@@ -352,14 +368,23 @@ export default function SupervisorClientes() {
     }
 
     try {
+      const updateData = {
+        status: newStatus,
+        status_blocked: newStatus === 'Activo' ? true : false,
+        activation_date: newStatus === 'Activo' ? activationDate : null
+      };
+
       const { error } = await supabase
         .from('clients')
-        .update({ status: newStatus })
+        .update(updateData)
         .eq('id', editingClient.id);
 
       if (error) throw error;
       setEditingClient(null);
+      setNewStatus('');
+      setActivationDate('');
       fetchData();
+      alert(`Estado actualizado a "${newStatus}" correctamente.`);
     } catch (error) {
       alert('Error actualizando estado: ' + error.message);
     }
@@ -499,8 +524,8 @@ export default function SupervisorClientes() {
 
   const activeClients = clients.filter(c => c.status !== 'Eliminado');
   const total = activeClients.length;
-  const totalActivos = activeClients.filter(c => c.status === 'Instalado').length;
-  const totalPendientes = activeClients.filter(c => ['Contactado', 'Aprobado'].includes(c.status)).length;
+  const totalActivos = activeClients.filter(c => c.status === 'Activo').length;
+  const totalPendientes = activeClients.filter(c => ['Ingresado'].includes(c.status)).length;
   const totalEliminados = clients.filter(c => c.status === 'Eliminado').length;
   const selectedPaymentMethod = formData.payment_method || PAYMENT_METHODS.BANK_ACCOUNT;
 
@@ -942,22 +967,87 @@ export default function SupervisorClientes() {
               <p style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
                 Cliente: <strong style={{ color: 'var(--primary)' }}>{editingClient.first_name} {editingClient.last_name}</strong>
               </p>
-              <form onSubmit={handleStatusChange}>
-                <div className="form-group" style={{ marginBottom: '1.5rem' }}>
-                  <label className="form-label">Nuevo Estado</label>
-                  <select className="form-select" value={newStatus} onChange={(e) => setNewStatus(e.target.value)}>
-                    <option value="Contactado">Contactado</option>
-                    <option value="Aprobado">Aprobado</option>
-                    <option value="Instalado">Instalado</option>
-                    <option value="Cancelado">Cancelado</option>
-                    <option value="Rechazado">Rechazado</option>
-                  </select>
+
+              {editingClient.status_blocked && (
+                <div style={{
+                  padding: '0.75rem',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '6px',
+                  marginBottom: '1rem',
+                  fontSize: '0.85rem',
+                  color: '#ef4444',
+                  fontWeight: 600
+                }}>
+                  ⛔ Este cliente está bloqueado porque ya está Activo. El estado no puede ser modificado.
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                  <button type="button" className="btn btn-secondary" onClick={() => setEditingClient(null)}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar</button>
+              )}
+
+              {!editingClient.status_blocked && (
+                <form onSubmit={handleStatusChange}>
+                  <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                    <label className="form-label">Nuevo Estado *</label>
+                    <select
+                      className="form-select"
+                      value={newStatus}
+                      onChange={(e) => {
+                        setNewStatus(e.target.value);
+                        setActivationDate('');
+                      }}
+                    >
+                      <option value="">Selecciona un estado</option>
+                      <option value="Ingresado">Ingresado</option>
+                      <option value="Activo">Activo</option>
+                      <option value="Cancelado">Cancelado</option>
+                      <option value="Rechazado">Rechazado</option>
+                    </select>
+                  </div>
+
+                  {newStatus && (
+                    <div style={{
+                      padding: '0.875rem',
+                      backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                      border: '1px solid rgba(59, 130, 246, 0.2)',
+                      borderRadius: '6px',
+                      marginBottom: '1.5rem',
+                      fontSize: '0.85rem',
+                      color: '#1e40af',
+                      lineHeight: '1.5'
+                    }}>
+                      <strong>ℹ️ {newStatus}:</strong><br />
+                      {STATUS_MESSAGES[newStatus]}
+                    </div>
+                  )}
+
+                  {newStatus === 'Activo' && (
+                    <div className="form-group" style={{ marginBottom: '1.5rem' }}>
+                      <label className="form-label">Fecha de Activación del Servicio *</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={activationDate}
+                        onChange={(e) => setActivationDate(e.target.value)}
+                        required
+                        max={new Date().toISOString().split('T')[0]}
+                      />
+                      <small style={{ color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
+                        Fecha cuando se instaló y activó el servicio (correo: "Oportunidad Ganada").
+                      </small>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                    <button type="button" className="btn btn-secondary" onClick={() => setEditingClient(null)}>Cancelar</button>
+                    <button type="submit" className="btn btn-primary"><Save size={18} /> Guardar</button>
+                  </div>
+                </form>
+              )}
+
+              {editingClient.status_blocked && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem', marginTop: '1.5rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setEditingClient(null)}>Cerrar</button>
                 </div>
-              </form>
+              )}
             </div>
           </div>
         </div>
