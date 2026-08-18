@@ -108,7 +108,7 @@ export default function SupervisorDashboard() {
         }
 
         const [{ data: clients }, { data: routes }] = await Promise.all([
-          supabase.from('clients').select('status'),
+          supabase.from('clients').select('status').eq('supervisor_id', user.id),
           supabase.from('routes').select('id').eq('supervisor_id', user.id)
         ]);
 

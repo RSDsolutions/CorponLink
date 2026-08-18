@@ -169,6 +169,7 @@ export default function SupervisorClientes() {
             province
           )
         `)
+        .eq('supervisor_id', user.id)
         .order('created_at', { ascending: false });
 
       if (clientsError) throw clientsError;
