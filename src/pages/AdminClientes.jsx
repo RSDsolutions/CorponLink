@@ -60,6 +60,7 @@ export default function AdminClientes() {
           *,
           profiles:asesor_id(full_name),
           advisors:advisor_id(code, full_name, province),
+          supervisor_profile:supervisor_id(full_name),
           route:route_id(id, sector_name, fecha, sector_rating, municipio, barrio)
         `)
         .order('created_at', { ascending: false });
@@ -189,36 +190,43 @@ export default function AdminClientes() {
 
   const exportToExcel = () => {
     if (filteredClients.length === 0) return;
-    const exportData = filteredClients.map(c => ({
-      'Fecha de Registro': new Date(c.created_at).toLocaleDateString(),
-      'Asesor': c.profiles?.full_name || 'N/A',
-      'Cédula': c.document_id,
-      'Nombres': c.first_name,
-      'Apellidos': c.last_name,
-      'Correo Electrónico': c.email || '',
-      'Teléfono Cliente': c.phone,
-      'Teléfono Referencia': c.reference_phone || '',
-      'Calle Principal y Secundaria': c.address,
-      'Referencia Vivienda': c.housing_reference || '',
-      'Banco': c.bank_name || '',
-      'Tipo de Cuenta': c.bank_account_type || '',
-      'Número de Cuenta': c.bank_account_number || '',
-      'Familia Plan': c.plan_family || '',
-      'Plan': c.plan || c.plan_name || '',
-      'Ancho de Banda': c.bandwidth || '',
-      'Promoción': c.promotion || '',
-      'Valor sin IVA ($)': c.plan_price_no_iva || '',
-      'CA': c.ca || '',
-      'BA': c.ba || '',
-      'NPC': c.npc || '',
-      'Estado Actual': c.status,
-      'Fecha de Activación': c.activation_date ? new Date(c.activation_date).toLocaleDateString() : '',
-      'Motivo Eliminación': c.deletion_reason || '',
-      'Notas': c.notes || ''
-    }));
+    const exportData = filteredClients.map(c => {
+      const supervisorName = c.supervisor_profile?.full_name || c.profiles?.full_name || 'N/A';
+      const advisorName = c.advisors?.full_name || c.profiles?.full_name || supervisorName;
+      const salesAdvisorName = advisorName === supervisorName ? supervisorName : advisorName;
+
+      return {
+        'Fecha de Registro': new Date(c.created_at).toLocaleDateString(),
+        'Supervisor': supervisorName,
+        'Asesor de Venta': salesAdvisorName,
+        'Cédula': c.document_id,
+        'Nombres': c.first_name,
+        'Apellidos': c.last_name,
+        'Correo Electrónico': c.email || '',
+        'Teléfono Cliente': c.phone,
+        'Teléfono Referencia': c.reference_phone || '',
+        'Calle Principal y Secundaria': c.address,
+        'Referencia Vivienda': c.housing_reference || '',
+        'Banco': c.bank_name || '',
+        'Tipo de Cuenta': c.bank_account_type || '',
+        'Número de Cuenta': c.bank_account_number || '',
+        'Familia Plan': c.plan_family || '',
+        'Plan': c.plan || c.plan_name || '',
+        'Ancho de Banda': c.bandwidth || '',
+        'Promoción': c.promotion || '',
+        'Valor sin IVA ($)': c.plan_price_no_iva || '',
+        'CA': c.ca || '',
+        'BA': c.ba || '',
+        'NPC': c.npc || '',
+        'Estado Actual': c.status,
+        'Fecha de Activación': c.activation_date ? new Date(c.activation_date).toLocaleDateString() : '',
+        'Motivo Eliminación': c.deletion_reason || '',
+        'Notas': c.notes || ''
+      };
+    });
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     worksheet['!cols'] = [
-      { wch: 15 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
+      { wch: 15 }, { wch: 22 }, { wch: 22 }, { wch: 16 }, { wch: 18 }, { wch: 18 },
       { wch: 25 }, { wch: 16 }, { wch: 16 }, { wch: 35 }, { wch: 30 },
       { wch: 18 }, { wch: 15 }, { wch: 18 }, { wch: 18 }, { wch: 15 },
       { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
