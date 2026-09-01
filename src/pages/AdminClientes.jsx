@@ -33,6 +33,8 @@ export default function AdminClientes() {
   const [dateFilter, setDateFilter] = useState('all');
   const [supervisorFilter, setSupervisorFilter] = useState('');
   const [supervisors, setSupervisors] = useState([]);
+  const [advisorsLookup, setAdvisorsLookup] = useState({});
+  const [supervisorsLookup, setSupervisorsLookup] = useState({});
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
@@ -54,47 +56,34 @@ export default function AdminClientes() {
 
   const fetchClients = async () => {
     try {
-      let data = [];
-      let error = null;
+      const [clientsQuery, advisorsQuery, supervisorsQuery] = await Promise.all([
+        supabase.from('clients').select('*').order('created_at', { ascending: false }),
+        supabase.from('advisors').select('id, full_name, code, province'),
+        supabase.from('profiles').select('id, full_name').eq('role', 'supervisor')
+      ]);
 
-      const primaryQuery = await supabase
-        .from('clients')
-        .select(`
-          *,
-          profiles:asesor_id(full_name),
-          advisors:advisor_id(code, full_name, province),
-          supervisor_profile:supervisor_id(full_name),
-          route:route_id(id, sector_name, fecha, sector_rating, municipio, barrio)
-        `)
-        .order('created_at', { ascending: false });
+      if (clientsQuery.error) throw clientsQuery.error;
 
-      if (primaryQuery.error) {
-        error = primaryQuery.error;
-      } else {
-        data = primaryQuery.data || [];
-      }
+      const advisorMap = {};
+      (advisorsQuery.data || []).forEach(advisor => {
+        advisorMap[advisor.id] = advisor;
+      });
 
-      if (error) {
-        const fallbackQuery = await supabase
-          .from('clients')
-          .select('*')
-          .order('created_at', { ascending: false });
+      const supervisorMap = {};
+      (supervisorsQuery.data || []).forEach(supervisor => {
+        supervisorMap[supervisor.id] = supervisor;
+      });
 
-        if (fallbackQuery.error) throw fallbackQuery.error;
-        data = fallbackQuery.data || [];
-      }
-
-      setClients(data);
-
-      try {
-        const { data: sups } = await supabase.from('profiles').select('id, full_name').eq('role', 'supervisor');
-        setSupervisors(sups || []);
-      } catch (e) {
-        setSupervisors([]);
-      }
+      setClients(clientsQuery.data || []);
+      setAdvisorsLookup(advisorMap);
+      setSupervisorsLookup(supervisorMap);
+      setSupervisors(supervisorsQuery.data || []);
     } catch (error) {
       console.error('Error fetching clients:', error.message);
       setClients([]);
+      setAdvisorsLookup({});
+      setSupervisorsLookup({});
+      setSupervisors([]);
     } finally {
       setLoading(false);
     }
@@ -208,11 +197,39 @@ export default function AdminClientes() {
     }
   };
 
+  const getAdvisorName = (client) => {
+    if (client.advisor_id && advisorsLookup[client.advisor_id]?.full_name) {
+      return advisorsLookup[client.advisor_id].full_name;
+    }
+
+    if (client.asesor_id && supervisorsLookup[client.asesor_id]?.full_name) {
+      return supervisorsLookup[client.asesor_id].full_name;
+    }
+
+    if (client.supervisor_id && supervisorsLookup[client.supervisor_id]?.full_name) {
+      return supervisorsLookup[client.supervisor_id].full_name;
+    }
+
+    return 'N/A';
+  };
+
+  const getSupervisorName = (client) => {
+    if (client.supervisor_id && supervisorsLookup[client.supervisor_id]?.full_name) {
+      return supervisorsLookup[client.supervisor_id].full_name;
+    }
+
+    if (client.asesor_id && supervisorsLookup[client.asesor_id]?.full_name) {
+      return supervisorsLookup[client.asesor_id].full_name;
+    }
+
+    return 'N/A';
+  };
+
   const exportToExcel = () => {
     if (filteredClients.length === 0) return;
     const exportData = filteredClients.map(c => {
-      const supervisorName = c.supervisor_profile?.full_name || c.profiles?.full_name || 'N/A';
-      const advisorName = c.advisors?.full_name || c.advisor_profile?.full_name || c.legacy_profile?.full_name || 'N/A';
+      const supervisorName = getSupervisorName(c);
+      const advisorName = getAdvisorName(c);
       const salesAdvisorName = advisorName === 'N/A' ? supervisorName : advisorName;
 
       return {
@@ -357,7 +374,12 @@ export default function AdminClientes() {
                         {new Date(c.created_at).toLocaleDateString()}
                       </div>
                       <div style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '0.25rem' }}>
-                        {c.advisors?.full_name ? `${c.advisors.code || ''} - ${c.advisors.full_name}`.trim().replace(/^\s*-\s*/, '') : c.advisor_profile?.full_name || c.legacy_profile?.full_name || c.supervisor_profile?.full_name || c.profiles?.full_name || 'N/A'}
+                        {(() => {
+                          const advisor = c.advisor_id && advisorsLookup[c.advisor_id]
+                            ? `${advisorsLookup[c.advisor_id].code || ''} - ${advisorsLookup[c.advisor_id].full_name}`.trim().replace(/^\s*-\s*/, '')
+                            : getAdvisorName(c);
+                          return advisor;
+                        })()}
                       </div>
                     </td>
                     <td>
