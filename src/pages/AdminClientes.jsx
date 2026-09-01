@@ -192,8 +192,8 @@ export default function AdminClientes() {
     if (filteredClients.length === 0) return;
     const exportData = filteredClients.map(c => {
       const supervisorName = c.supervisor_profile?.full_name || c.profiles?.full_name || 'N/A';
-      const advisorName = c.advisors?.full_name || c.profiles?.full_name || supervisorName;
-      const salesAdvisorName = advisorName === supervisorName ? supervisorName : advisorName;
+      const advisorName = c.advisors?.full_name || 'N/A';
+      const salesAdvisorName = advisorName === 'N/A' ? supervisorName : advisorName;
 
       return {
         'Fecha de Registro': new Date(c.created_at).toLocaleDateString(),
@@ -337,7 +337,7 @@ export default function AdminClientes() {
                         {new Date(c.created_at).toLocaleDateString()}
                       </div>
                       <div style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '0.25rem' }}>
-                        {c.advisors ? `${c.advisors.code} - ${c.advisors.full_name}` : c.profiles?.full_name || 'N/A'}
+                        {c.advisors ? `${c.advisors.code} - ${c.advisors.full_name}` : c.supervisor_profile?.full_name || c.profiles?.full_name || 'N/A'}
                       </div>
                     </td>
                     <td>
