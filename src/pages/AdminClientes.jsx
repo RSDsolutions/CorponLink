@@ -54,7 +54,10 @@ export default function AdminClientes() {
 
   const fetchClients = async () => {
     try {
-      const { data, error } = await supabase
+      let data = [];
+      let error = null;
+
+      const primaryQuery = await supabase
         .from('clients')
         .select(`
           *,
@@ -64,9 +67,25 @@ export default function AdminClientes() {
           route:route_id(id, sector_name, fecha, sector_rating, municipio, barrio)
         `)
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      setClients(data || []);
-      // fetch supervisors for filter
+
+      if (primaryQuery.error) {
+        error = primaryQuery.error;
+      } else {
+        data = primaryQuery.data || [];
+      }
+
+      if (error) {
+        const fallbackQuery = await supabase
+          .from('clients')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (fallbackQuery.error) throw fallbackQuery.error;
+        data = fallbackQuery.data || [];
+      }
+
+      setClients(data);
+
       try {
         const { data: sups } = await supabase.from('profiles').select('id, full_name').eq('role', 'supervisor');
         setSupervisors(sups || []);
@@ -75,6 +94,7 @@ export default function AdminClientes() {
       }
     } catch (error) {
       console.error('Error fetching clients:', error.message);
+      setClients([]);
     } finally {
       setLoading(false);
     }
@@ -192,7 +212,7 @@ export default function AdminClientes() {
     if (filteredClients.length === 0) return;
     const exportData = filteredClients.map(c => {
       const supervisorName = c.supervisor_profile?.full_name || c.profiles?.full_name || 'N/A';
-      const advisorName = c.advisors?.full_name || 'N/A';
+      const advisorName = c.advisors?.full_name || c.advisor_profile?.full_name || c.legacy_profile?.full_name || 'N/A';
       const salesAdvisorName = advisorName === 'N/A' ? supervisorName : advisorName;
 
       return {
@@ -337,7 +357,7 @@ export default function AdminClientes() {
                         {new Date(c.created_at).toLocaleDateString()}
                       </div>
                       <div style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '0.25rem' }}>
-                        {c.advisors ? `${c.advisors.code} - ${c.advisors.full_name}` : c.supervisor_profile?.full_name || c.profiles?.full_name || 'N/A'}
+                        {c.advisors?.full_name ? `${c.advisors.code || ''} - ${c.advisors.full_name}`.trim().replace(/^\s*-\s*/, '') : c.advisor_profile?.full_name || c.legacy_profile?.full_name || c.supervisor_profile?.full_name || c.profiles?.full_name || 'N/A'}
                       </div>
                     </td>
                     <td>
