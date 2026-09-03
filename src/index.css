@@ -230,6 +230,30 @@ h1, h2, h3, h4 {
   margin-bottom: 2rem;
 }
 
+.clients-page-header {
+  margin-bottom: 1.5rem;
+}
+
+.clients-page-header h2 {
+  font-size: clamp(1.6rem, 3vw, 2.15rem);
+  margin: 0.2rem 0 0.35rem;
+}
+
+.clients-page-header .text-muted {
+  max-width: 560px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .supervisor-client-filters-primary {
   grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(150px, 1fr));
 }
@@ -239,6 +263,10 @@ h1, h2, h3, h4 {
 }
 
 @media (max-width: 900px) {
+  .clients-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .supervisor-client-filters-primary,
   .supervisor-client-filters-secondary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -246,6 +274,21 @@ h1, h2, h3, h4 {
 }
 
 @media (max-width: 560px) {
+  .clients-card-header,
+  .clients-filter-panel {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .clients-card-header {
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .filter-count {
+    align-self: flex-start;
+  }
+
   .supervisor-client-filters-primary,
   .supervisor-client-filters-secondary {
     grid-template-columns: 1fr;
@@ -258,6 +301,12 @@ h1, h2, h3, h4 {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
+}
+
+.clients-kpi-grid {
+  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .kpi-card {
@@ -276,6 +325,11 @@ h1, h2, h3, h4 {
 .kpi-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+.clients-kpi-grid .kpi-card {
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
 }
 
 .kpi-icon {
@@ -325,6 +379,67 @@ h1, h2, h3, h4 {
   border-bottom: 1px solid var(--border-light);
 }
 
+.clients-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.clients-card-header {
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.clients-list-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.clients-list-heading h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.clients-list-heading p {
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.section-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  color: var(--primary);
+  background: var(--primary-light);
+}
+
+.filter-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--primary-light);
+  border-radius: 999px;
+  color: var(--primary);
+  background: #fafaff;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.clients-filter-panel {
+  padding: 1rem 1.5rem 1.15rem;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, #fbfcff 0%, #f8fafc 100%);
+}
+
+.clients-table-wrap {
+  min-height: 180px;
+}
+
 /* Tables Premium */
 .table-responsive {
   width: 100%;
@@ -369,6 +484,50 @@ h1, h2, h3, h4 {
   background-color: var(--surface-hover);
 }
 
+.client-row {
+  cursor: pointer;
+}
+
+.client-row td:first-child {
+  border-left: 3px solid transparent;
+}
+
+.client-row:hover td:first-child {
+  border-left-color: var(--primary);
+}
+
+.client-row-deleted {
+  opacity: 0.7;
+  background-color: rgba(239, 68, 68, 0.03);
+}
+
+.table-empty {
+  display: table-cell;
+  padding: 3rem 1rem !important;
+  color: var(--text-muted) !important;
+  text-align: center;
+}
+
+.table-empty svg,
+.table-empty strong,
+.table-empty span {
+  display: block;
+  margin: 0 auto 0.45rem;
+}
+
+.table-empty svg {
+  color: var(--text-light);
+}
+
+.table-empty strong {
+  color: var(--text-main);
+  font-size: 0.95rem;
+}
+
+.table-empty span {
+  font-size: 0.8rem;
+}
+
 .client-name {
   font-weight: 600;
   color: var(--secondary);
@@ -391,7 +550,7 @@ h1, h2, h3, h4 {
   letter-spacing: 0.025em;
 }
 
-.badge-registrado { background: var(--status-neutral-bg); color: var(--status-neutral-text); }
+.badge-registrado, .badge-ingresado { background: var(--status-neutral-bg); color: var(--status-neutral-text); }
 .badge-contactado { background: var(--status-info-bg); color: var(--status-info-text); }
 .badge-programado { background: var(--status-warning-bg); color: var(--status-warning-text); }
 .badge-activo { background: var(--status-success-bg); color: var(--status-success-text); }
@@ -650,6 +809,10 @@ h1, h2, h3, h4 {
   .kpi-value { font-size: 1.5rem; }
   .kpi-label { font-size: 0.75rem; }
   .kpi-icon { width: 36px; height: 36px; margin-bottom: 0.75rem; }
+
+  .clients-page-header h2 { font-size: 1.7rem; }
+  .clients-kpi-grid .kpi-card { padding: 0.85rem; }
+  .clients-kpi-grid .kpi-label { min-height: 2.25rem; }
 
   /* Tables: horizontal scroll + smaller text */
   .table th, .table td { padding: 0.75rem 0.625rem; font-size: 0.8rem; }

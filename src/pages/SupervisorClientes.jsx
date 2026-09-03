@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, getCurrentAuthUser } from '../services/supabase';
-import { Users, X, Save, Plus, AlertTriangle, ShieldCheck, Trash2, Cpu, CreditCard, MapPin, User, Mail, FileText, Filter, Search, RotateCcw } from 'lucide-react';
+import { Users, X, Save, Plus, AlertTriangle, ShieldCheck, Trash2, Cpu, CreditCard, MapPin, User, Mail, FileText, Filter, Search, RotateCcw, SlidersHorizontal } from 'lucide-react';
 
 const PAYMENT_METHODS = {
   BANK_ACCOUNT: 'Cuenta Bancaria',
@@ -581,14 +581,19 @@ export default function SupervisorClientes() {
   const totalActivos = activeClients.filter(c => c.status === 'Activo').length;
   const totalPendientes = activeClients.filter(c => ['Ingresado'].includes(c.status)).length;
   const totalEliminados = clients.filter(c => c.status === 'Eliminado').length;
+  const activeFilterCount = Object.entries(filters).filter(([key, value]) => {
+    if (key === 'dateField') return value !== 'created_at';
+    return Boolean(value);
+  }).length;
   const selectedPaymentMethod = formData.payment_method || PAYMENT_METHODS.BANK_ACCOUNT;
 
   return (
     <div>
-      <div className="page-header">
+      <div className="page-header clients-page-header">
         <div>
-          <h2>Gestión de Clientes</h2>
-          <p className="text-muted">Registro completo de clientes, datos bancarios, planes y datos técnicos (CA, BA, NPC).</p>
+          <div className="eyebrow"><Users size={14} /> Cartera del supervisor</div>
+          <h2>Clientes</h2>
+          <p className="text-muted">Consulta, filtra y actualiza la información de tu cartera.</p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={18} /> Nuevo Cliente
@@ -596,7 +601,7 @@ export default function SupervisorClientes() {
       </div>
 
       {/* KPIs */}
-      <div className="kpi-grid">
+      <div className="kpi-grid clients-kpi-grid">
         <div className="kpi-card">
           <div className="kpi-icon blue"><Users size={24} /></div>
           <div className="kpi-value">{activeClients.length}</div>
@@ -620,16 +625,19 @@ export default function SupervisorClientes() {
       </div>
 
       {/* Tabla de Clientes */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Filter size={18} />
-            <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Listado de Clientes</h3>
+      <div className="card clients-card">
+        <div className="card-header clients-card-header">
+          <div className="clients-list-heading">
+            <div className="section-icon"><Filter size={17} /></div>
+            <div>
+              <h3>Listado de clientes</h3>
+              <p>{filteredClients.length} resultados de {clients.length} registrados</p>
+            </div>
           </div>
-          <span className="text-muted" style={{ fontSize: '0.85rem' }}>{filteredClients.length} de {clients.length}</span>
+          {activeFilterCount > 0 && <span className="filter-count"><SlidersHorizontal size={14} /> {activeFilterCount} filtro{activeFilterCount === 1 ? '' : 's'} activo{activeFilterCount === 1 ? '' : 's'}</span>}
         </div>
 
-        <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface-muted, #f8fafc)' }}>
+        <div className="clients-filter-panel">
           <div className="supervisor-client-filters-primary" style={{ display: 'grid', gap: '0.75rem', alignItems: 'end' }}>
             <div>
               <label className="form-label">Buscar</label>
@@ -687,7 +695,7 @@ export default function SupervisorClientes() {
           </div>
         </div>
 
-        <div className="table-responsive">
+        <div className="table-responsive clients-table-wrap">
           <table className="table">
             <thead>
               <tr>
@@ -706,7 +714,7 @@ export default function SupervisorClientes() {
                 const paymentSummary = getPaymentSummary(c);
 
                 return (
-                  <tr key={c.id} style={{ opacity: isEliminado ? 0.7 : 1, backgroundColor: isEliminado ? 'rgba(239, 68, 68, 0.03)' : 'transparent', cursor: 'pointer' }} onClick={() => setViewClient(c)}>
+                    <tr key={c.id} className={isEliminado ? 'client-row client-row-deleted' : 'client-row'} onClick={() => setViewClient(c)}>
                     <td>
                       <div className="client-name">{c.first_name} {c.last_name}</div>
                       <div className="client-doc">Cédula: <strong>{c.document_id}</strong></div>
@@ -813,8 +821,8 @@ export default function SupervisorClientes() {
                     <td>
                       {!isEliminado ? (
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
-                          <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }}>
-                            Estado
+                          <button className="btn btn-sm btn-secondary" onClick={() => { setEditingClient(c); setNewStatus(c.status); }} title="Actualizar estado">
+                            <SlidersHorizontal size={13} /> Estado
                           </button>
                           <button
                             className="btn btn-sm"
@@ -837,13 +845,13 @@ export default function SupervisorClientes() {
               })}
               {filteredClients.length === 0 && (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No hay clientes que coincidan con los filtros seleccionados.</td>
+                  <td colSpan="6" className="table-empty"><Search size={25} /><strong>No encontramos clientes</strong><span>Prueba cambiando los filtros o la búsqueda.</span></td>
                 </tr>
               )}
               {clients.length === 0 && !loading && (
                 <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-                    No hay clientes registrados aún. ¡Registra tu primer cliente!
+                  <td colSpan="6" className="table-empty table-empty-first">
+                    <Users size={28} /><strong>Aún no tienes clientes registrados</strong><span>Registra tu primer cliente para comenzar a gestionar tu cartera.</span>
                   </td>
                 </tr>
               )}
