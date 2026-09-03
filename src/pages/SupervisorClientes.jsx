@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase, getCurrentAuthUser } from '../services/supabase';
-import { Users, X, Save, Plus, AlertTriangle, ShieldCheck, Trash2, Cpu, CreditCard, MapPin, User, Mail, FileText } from 'lucide-react';
+import { Users, X, Save, Plus, AlertTriangle, ShieldCheck, Trash2, Cpu, CreditCard, MapPin, User, Mail, FileText, Filter, Search, RotateCcw } from 'lucide-react';
 
 const PAYMENT_METHODS = {
   BANK_ACCOUNT: 'Cuenta Bancaria',
@@ -54,6 +54,16 @@ export default function SupervisorClientes() {
   const [currentUser, setCurrentUser] = useState(null);
   const [advisorsList, setAdvisorsList] = useState([]);
   const [plans, setPlans] = useState([]);
+  const [filters, setFilters] = useState({
+    search: '',
+    dateField: 'created_at',
+    dateFrom: '',
+    dateTo: '',
+    advisorId: '',
+    planFamily: '',
+    plan: '',
+    status: ''
+  });
 
   // Modal Nuevo Cliente
   const [showModal, setShowModal] = useState(false);
@@ -220,6 +230,49 @@ export default function SupervisorClientes() {
 
   const familyOptions = [...new Set(plans.map(plan => plan.family).filter(Boolean))];
   const planOptions = formData.plan_family ? plans.filter(plan => plan.family === formData.plan_family) : [];
+  const filterPlanOptions = filters.planFamily ? plans.filter(plan => plan.family === filters.planFamily) : [];
+
+  const updateFilter = (name, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'planFamily' ? { plan: '' } : {})
+    }));
+  };
+
+  const resetFilters = () => setFilters({
+    search: '',
+    dateField: 'created_at',
+    dateFrom: '',
+    dateTo: '',
+    advisorId: '',
+    planFamily: '',
+    plan: '',
+    status: ''
+  });
+
+  const filteredClients = clients.filter(client => {
+    const search = filters.search.trim().toLowerCase();
+    const advisorName = [
+      client.advisors?.code,
+      client.advisors?.full_name,
+      client.advisors?.first_name,
+      client.advisors?.second_name,
+      client.advisors?.first_surname,
+      client.advisors?.second_surname
+    ].filter(Boolean).join(' ').toLowerCase();
+    const searchableText = [client.first_name, client.last_name, client.document_id, client.email, client.phone, advisorName]
+      .filter(Boolean).join(' ').toLowerCase();
+    const clientDate = client[filters.dateField] ? new Date(client[filters.dateField]).toISOString().slice(0, 10) : '';
+
+    return (!search || searchableText.includes(search))
+      && (!filters.advisorId || client.advisor_id === filters.advisorId)
+      && (!filters.planFamily || client.plan_family === filters.planFamily)
+      && (!filters.plan || client.plan === filters.plan)
+      && (!filters.status || client.status === filters.status)
+      && (!filters.dateFrom || (clientDate && clientDate >= filters.dateFrom))
+      && (!filters.dateTo || (clientDate && clientDate <= filters.dateTo));
+  });
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -569,7 +622,69 @@ export default function SupervisorClientes() {
       {/* Tabla de Clientes */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
         <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)' }}>
-          <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Listado de Clientes</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Filter size={18} />
+            <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Listado de Clientes</h3>
+          </div>
+          <span className="text-muted" style={{ fontSize: '0.85rem' }}>{filteredClients.length} de {clients.length}</span>
+        </div>
+
+        <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)', backgroundColor: 'var(--surface-muted, #f8fafc)' }}>
+          <div className="supervisor-client-filters-primary" style={{ display: 'grid', gap: '0.75rem', alignItems: 'end' }}>
+            <div>
+              <label className="form-label">Buscar</label>
+              <div style={{ position: 'relative' }}>
+                <Search size={16} style={{ position: 'absolute', left: '0.7rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input className="form-input" style={{ paddingLeft: '2.2rem' }} value={filters.search} onChange={e => updateFilter('search', e.target.value)} placeholder="Nombre, cédula, correo..." />
+              </div>
+            </div>
+            <div>
+              <label className="form-label">Asesor</label>
+              <select className="form-select" value={filters.advisorId} onChange={e => updateFilter('advisorId', e.target.value)}>
+                <option value="">Todos los asesores</option>
+                {advisorsList.map(advisor => <option key={advisor.id} value={advisor.id}>{advisor.code ? `${advisor.code} - ` : ''}{advisor.full_name || `${advisor.first_name || ''} ${advisor.first_surname || ''}`.trim()}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Familia de plan</label>
+              <select className="form-select" value={filters.planFamily} onChange={e => updateFilter('planFamily', e.target.value)}>
+                <option value="">Todas las familias</option>
+                {familyOptions.map(family => <option key={family} value={family}>{family}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Plan</label>
+              <select className="form-select" value={filters.plan} onChange={e => updateFilter('plan', e.target.value)} disabled={!filters.planFamily}>
+                <option value="">Todos los planes</option>
+                {filterPlanOptions.map(plan => <option key={plan.id || plan.plan} value={plan.plan}>{plan.plan}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="supervisor-client-filters-secondary" style={{ display: 'grid', gap: '0.75rem', alignItems: 'end', marginTop: '0.75rem' }}>
+            <div>
+              <label className="form-label">Estado</label>
+              <select className="form-select" value={filters.status} onChange={e => updateFilter('status', e.target.value)}>
+                <option value="">Todos los estados</option>
+                {['Ingresado', 'Activo', 'Cancelado', 'Rechazado', 'Eliminado'].map(status => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Fecha</label>
+              <select className="form-select" value={filters.dateField} onChange={e => updateFilter('dateField', e.target.value)}>
+                <option value="created_at">Registro</option>
+                <option value="activation_date">Activación</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Desde</label>
+              <input type="date" className="form-input" value={filters.dateFrom} onChange={e => updateFilter('dateFrom', e.target.value)} />
+            </div>
+            <div>
+              <label className="form-label">Hasta</label>
+              <input type="date" className="form-input" value={filters.dateTo} onChange={e => updateFilter('dateTo', e.target.value)} />
+            </div>
+            <button type="button" className="btn btn-secondary" onClick={resetFilters} title="Limpiar filtros"><RotateCcw size={16} /> Limpiar</button>
+          </div>
         </div>
 
         <div className="table-responsive">
@@ -585,7 +700,7 @@ export default function SupervisorClientes() {
               </tr>
             </thead>
             <tbody>
-              {clients.map(c => {
+              {filteredClients.map(c => {
                 const hasTechData = Boolean(c.ca && c.ba && c.npc);
                 const isEliminado = c.status === 'Eliminado';
                 const paymentSummary = getPaymentSummary(c);
@@ -720,6 +835,11 @@ export default function SupervisorClientes() {
                   </tr>
                 );
               })}
+              {filteredClients.length === 0 && (
+                <tr>
+                  <td colSpan="6" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No hay clientes que coincidan con los filtros seleccionados.</td>
+                </tr>
+              )}
               {clients.length === 0 && !loading && (
                 <tr>
                   <td colSpan="6" style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
