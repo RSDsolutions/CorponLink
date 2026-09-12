@@ -30,13 +30,16 @@ export default function AdminClientes() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [dateFilter, setDateFilter] = useState('all');
   const [supervisorFilter, setSupervisorFilter] = useState('');
+  const [advisorFilter, setAdvisorFilter] = useState('');
   const [supervisors, setSupervisors] = useState([]);
+  const [advisors, setAdvisors] = useState([]);
   const [advisorsLookup, setAdvisorsLookup] = useState({});
   const [supervisorsLookup, setSupervisorsLookup] = useState({});
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [dateTypeFilter, setDateTypeFilter] = useState('created_at');
+  const [monthFilter, setMonthFilter] = useState('');
 
   // Modal Estado / Soft Delete
   const [editingClient, setEditingClient] = useState(null);
@@ -78,12 +81,14 @@ export default function AdminClientes() {
       setAdvisorsLookup(advisorMap);
       setSupervisorsLookup(supervisorMap);
       setSupervisors(supervisorsQuery.data || []);
+      setAdvisors(advisorsQuery.data || []);
     } catch (error) {
       console.error('Error fetching clients:', error.message);
       setClients([]);
       setAdvisorsLookup({});
       setSupervisorsLookup({});
       setSupervisors([]);
+      setAdvisors([]);
     } finally {
       setLoading(false);
     }
@@ -108,17 +113,34 @@ export default function AdminClientes() {
       matchesStatus = true;
     }
     
-    // Date range filter: if dateFrom/dateTo provided, filter by created_at between
+    // Date filters
     let matchesDate = true;
-    if (dateFrom || dateTo) {
-      const clientDate = new Date(c.created_at);
-      if (dateFrom) {
-        const from = new Date(dateFrom + 'T00:00:00');
-        if (clientDate < from) matchesDate = false;
+    const targetDateStr = dateTypeFilter === 'created_at' ? c.created_at : c.activation_date;
+    const clientDate = targetDateStr ? new Date(targetDateStr) : null;
+
+    if (monthFilter) {
+      if (!clientDate) {
+        matchesDate = false;
+      } else {
+        const [year, month] = monthFilter.split('-');
+        if (clientDate.getFullYear() !== parseInt(year, 10) || clientDate.getMonth() + 1 !== parseInt(month, 10)) {
+          matchesDate = false;
+        }
       }
-      if (dateTo) {
-        const to = new Date(dateTo + 'T23:59:59');
-        if (clientDate > to) matchesDate = false;
+    }
+
+    if (matchesDate && (dateFrom || dateTo)) {
+      if (!clientDate) {
+        matchesDate = false;
+      } else {
+        if (dateFrom) {
+          const from = new Date(dateFrom + 'T00:00:00');
+          if (clientDate < from) matchesDate = false;
+        }
+        if (dateTo) {
+          const to = new Date(dateTo + 'T23:59:59');
+          if (clientDate > to) matchesDate = false;
+        }
       }
     }
 
@@ -127,8 +149,14 @@ export default function AdminClientes() {
     if (supervisorFilter) {
       matchesSupervisor = c.supervisor_id === supervisorFilter;
     }
+
+    // Advisor filter
+    let matchesAdvisor = true;
+    if (advisorFilter) {
+      matchesAdvisor = c.advisor_id === advisorFilter;
+    }
     
-    return matchesSearch && matchesStatus && matchesDate && matchesSupervisor;
+    return matchesSearch && matchesStatus && matchesDate && matchesSupervisor && matchesAdvisor;
   });
 
   const activeClients = filteredClients.filter(c => c.status !== 'Eliminado');
@@ -312,16 +340,18 @@ export default function AdminClientes() {
 
       {/* Tabla con filtros */}
       <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', overflowX: 'auto' }}>
-          <div style={{ position: 'relative', flex: 2, minWidth: '240px' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text" className="form-input" placeholder="Buscar cliente, cédula, teléfono o correo..."
-              style={{ paddingLeft: '2.5rem' }} value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-            <div style={{ flex: '1 1 180px', minWidth: '180px', minWidth: 0 }}>
+        <div className="card-header" style={{ padding: '1.5rem', marginBottom: 0, borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', width: '100%', alignItems: 'center' }}>
+            <div style={{ position: 'relative', flex: '1 1 240px' }}>
+              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text" className="form-input" placeholder="Buscar cliente, cédula, teléfono o correo..."
+                style={{ paddingLeft: '2.5rem' }} value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div style={{ flex: '1 1 180px' }}>
               <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                 <option value="">Todos los estados</option>
                 <option value="Ingresado">Ingresado</option>
@@ -331,8 +361,7 @@ export default function AdminClientes() {
                 <option value="Eliminado">Eliminado (Borrado Lógico)</option>
               </select>
             </div>
-
-            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+            <div style={{ flex: '1 1 180px' }}>
               <select className="form-select" value={supervisorFilter} onChange={(e) => setSupervisorFilter(e.target.value)}>
                 <option value="">Todos los supervisores</option>
                 {supervisors.map(s => (
@@ -340,13 +369,44 @@ export default function AdminClientes() {
                 ))}
               </select>
             </div>
-
-            <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <input type="date" className="form-input" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} style={{ minWidth: 0 }} />
-              <span style={{ color: 'var(--text-muted)' }}>—</span>
-              <input type="date" className="form-input" value={dateTo} onChange={(e) => setDateTo(e.target.value)} style={{ minWidth: 0 }} />
-              <button className="btn btn-secondary" onClick={() => { setDateFrom(''); setDateTo(''); }}>Limpiar</button>
+            <div style={{ flex: '1 1 180px' }}>
+              <select className="form-select" value={advisorFilter} onChange={(e) => setAdvisorFilter(e.target.value)}>
+                <option value="">Todos los asesores</option>
+                {advisors.map(a => (
+                  <option key={a.id} value={a.id}>{a.full_name}</option>
+                ))}
+              </select>
             </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', width: '100%', alignItems: 'center', padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Fechas por:</span>
+              <select className="form-select" style={{ width: 'auto', padding: '0.35rem 2rem 0.35rem 0.75rem', fontSize: '0.85rem' }} value={dateTypeFilter} onChange={(e) => setDateTypeFilter(e.target.value)}>
+                <option value="created_at">Creación</option>
+                <option value="activation_date">Activación</option>
+              </select>
+            </div>
+
+            <div style={{ width: '1px', height: '24px', backgroundColor: 'var(--border)', margin: '0 0.25rem' }}></div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Mes:</span>
+              <input type="month" className="form-input" style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }} value={monthFilter} onChange={(e) => { setMonthFilter(e.target.value); setDateFrom(''); setDateTo(''); }} />
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Rango:</span>
+              <input type="date" className="form-input" style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }} value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setMonthFilter(''); }} />
+              <span style={{ color: 'var(--text-muted)' }}>—</span>
+              <input type="date" className="form-input" style={{ width: 'auto', padding: '0.35rem 0.5rem', fontSize: '0.85rem' }} value={dateTo} onChange={(e) => { setDateTo(e.target.value); setMonthFilter(''); }} />
+            </div>
+            
+            {(monthFilter || dateFrom || dateTo) && (
+              <button className="btn btn-sm btn-secondary" onClick={() => { setMonthFilter(''); setDateFrom(''); setDateTo(''); }} style={{ marginLeft: 'auto' }}>Limpiar fechas</button>
+            )}
+          </div>
+
         </div>
 
         <div className="table-responsive">
